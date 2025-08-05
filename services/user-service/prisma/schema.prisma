@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  playerQuizzes PlayerQuiz[]
+
+  @@map("users")
+}
+
+model PlayerQuiz {
+  id        String   @id @default(cuid())
+  playerId  String
+  quizId    String
+  joinedAt  DateTime @default(now())
+  player    User     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, quizId])
+  @@map("player_quiz")
+} 
