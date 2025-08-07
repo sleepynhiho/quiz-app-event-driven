@@ -1,5 +1,5 @@
 # Valid token generated using your actual JWT secret
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc1NDMyOTkyNiwiZXhwIjoxNzU0NDE2MzI2fQ.ajNP8mO5foKZtm6eTOOexcry8fzoK9F2SvM8JSQ9HfM"
+$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc1NDQ2OTI1MCwiZXhwIjoxNzU0NTU1NjUwfQ.c715fWlX0oseTB13UZrGqk-aFaVbjO1E4fyGeqGbukM"
 
 # Quiz data
 $body = @{

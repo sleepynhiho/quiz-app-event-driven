@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS answers (
     UNIQUE(participant_id, question_id)
 );
 
+-- Create quiz_players table for tracking quiz participants and their scores
+CREATE TABLE IF NOT EXISTS quiz_players (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    player_id UUID NOT NULL,
+    score INTEGER DEFAULT 0,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(quiz_id, player_id)
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_quizzes_code ON quizzes(code);
 CREATE INDEX IF NOT EXISTS idx_quizzes_host_id ON quizzes(host_id);
@@ -72,6 +82,10 @@ CREATE INDEX IF NOT EXISTS idx_participants_user_id ON participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_answers_participant_id ON answers(participant_id);
 CREATE INDEX IF NOT EXISTS idx_answers_question_id ON answers(question_id);
 CREATE INDEX IF NOT EXISTS idx_answers_answered_at ON answers(answered_at);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_players_quiz_id ON quiz_players(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_players_player_id ON quiz_players(player_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_players_joined_at ON quiz_players(joined_at);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

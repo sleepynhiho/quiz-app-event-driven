@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import routes from './api/routes';
 import { database } from './db/database';
 import { kafkaProducer } from './kafka/producer';
+import { kafkaConsumer } from './kafka/consumer';
 import { createErrorResponse } from './utils/helpers';
 
 // Load environment variables
@@ -72,6 +73,8 @@ const gracefulShutdown = async () => {
   console.log('Received shutdown signal, closing gracefully...');
   
   try {
+    await kafkaConsumer.stop();
+    await kafkaConsumer.disconnect();
     await kafkaProducer.disconnect();
     await database.close();
     console.log('Resources cleaned up successfully');
@@ -95,10 +98,14 @@ const startServer = async () => {
     // Connect Kafka producer
     await kafkaProducer.connect();
     
+    // Start Kafka consumer
+    await kafkaConsumer.startConsuming();
+    
     // Start the server
     app.listen(PORT, () => {
       console.log(`Quiz Service running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log('Kafka consumer listening for player.joined events');
     });
   } catch (error) {
     console.error('Failed to start server:', error);

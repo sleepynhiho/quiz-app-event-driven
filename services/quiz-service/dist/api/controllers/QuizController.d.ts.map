@@ -1,0 +1,1 @@
+{"version":3,"file":"QuizController.d.ts","sourceRoot":"","sources":["../../../src/api/controllers/QuizController.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAM5C,qBAAa,cAAc;IACzB,OAAO,CAAC,WAAW,CAAc;;IAMjC,UAAU,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,KAAG,OAAO,CAAC,IAAI,CAAC,CAoD7D;CACH"}

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 // Use the secret from docker-compose.yml
-const JWT_SECRET = 'your-super-secret-jwt-key-change-this-in-production';
+const JWT_SECRET = '5dad9040183348ba83ae86bcd14f535a';
 
 // Create a payload for testing
 const payload = {

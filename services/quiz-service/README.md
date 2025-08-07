@@ -142,9 +142,23 @@ CREATE TABLE questions (
 );
 ```
 
+### Quiz Players Table
+```sql
+CREATE TABLE quiz_players (
+  id UUID PRIMARY KEY,
+  quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  player_id UUID NOT NULL,
+  score INTEGER DEFAULT 0,
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(quiz_id, player_id)
+);
+```
+
 ## Kafka Events
 
-### quiz.created
+### Published Events
+
+#### quiz.created
 Published when a new quiz is created.
 
 **Topic:** `quiz.created`
@@ -157,16 +171,52 @@ Published when a new quiz is created.
 }
 ```
 
+### Consumed Events
+
+#### player.joined
+Consumed when a player joins a quiz (published by user-service).
+
+**Topic:** `player.joined`
+**Payload:**
+```json
+{
+  "playerId": "456e7890-e89b-12d3-a456-426614174003",
+  "quizId": "123e4567-e89b-12d3-a456-426614174000"
+}
+```
+
+**Action:** Inserts a record into the `quiz_players` table with the player information.
+
+## Testing
+
+### Testing the Kafka Consumer
+
+To test the player.joined event consumer:
+
+```bash
+# Start the quiz service (make sure Kafka and PostgreSQL are running)
+npm run dev
+
+# In another terminal, run the test script
+node test-player-joined.js
+```
+
+The test script will publish a sample `player.joined` event to Kafka, and you should see the consumer processing it in the quiz service logs.
+
 ## Development
 
 The service uses TypeScript and includes:
 - Express.js framework
 - PostgreSQL with native driver
-- KafkaJS for event publishing
+- KafkaJS for event publishing and consuming
 - Joi for validation
 - JWT for authentication
 - Helmet for security
 - CORS support
+
+### Kafka Integration
+- **Producer**: Publishes `quiz.created` events when new quizzes are created
+- **Consumer**: Listens to `player.joined` events and updates the quiz_players table
 
 ## Error Handling
 

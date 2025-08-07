@@ -37,6 +37,11 @@ export interface KafkaQuizCreatedEvent {
   hostId: string;
 }
 
+export interface KafkaPlayerJoinedEvent {
+  playerId: string;
+  quizId: string;
+}
+
 export interface AuthenticatedUser {
   id: string;
   email?: string;

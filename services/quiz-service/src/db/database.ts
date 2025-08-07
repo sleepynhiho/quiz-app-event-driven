@@ -122,6 +122,28 @@ class Database {
   async close(): Promise<void> {
     await this.pool.end();
   }
+
+  async insertQuizPlayer(quizId: string, playerId: string): Promise<void> {
+    const client = await this.getClient();
+    try {
+      await client.query(
+        `INSERT INTO quiz_players (quiz_id, player_id, score, joined_at) 
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (quiz_id, player_id) DO NOTHING`,
+        [quizId, playerId, 0, new Date()]
+      );
+      console.log(`Player ${playerId} added to quiz ${quizId}`);
+    } catch (error) {
+      console.error('Error inserting quiz player:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 export const database = new Database();
+
+// Export convenience function
+export const insertQuizPlayer = (quizId: string, playerId: string) => 
+  database.insertQuizPlayer(quizId, playerId);

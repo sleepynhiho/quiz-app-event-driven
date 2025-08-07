@@ -1,0 +1,1 @@
+{"version":3,"file":"QuizService.d.ts","sourceRoot":"","sources":["../../src/services/QuizService.ts"],"names":[],"mappings":"AAAA,OAAO,EAAkB,iBAAiB,EAAE,kBAAkB,EAAyB,MAAM,UAAU,CAAC;AAKxG,qBAAa,WAAW;IAChB,UAAU,CAAC,QAAQ,EAAE,iBAAiB,EAAE,MAAM,EAAE,MAAM,GAAG,OAAO,CAAC,kBAAkB,CAAC;CAiD3F"}
