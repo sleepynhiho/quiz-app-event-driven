@@ -87,6 +87,22 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    # Kafka UI - Kafdrop
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    container_name: quiz-kafdrop
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+      JVM_OPTS: "-Xms32M -Xmx128M"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - quiz-network
+
 
 volumes:
   postgres_data:
