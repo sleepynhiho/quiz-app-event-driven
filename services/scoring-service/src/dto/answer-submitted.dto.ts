@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsDateString, IsUUID } from 'class-validator';
+import { IsString, IsBoolean, IsUUID, IsOptional, IsNumber } from 'class-validator';
 
 export class AnswerSubmittedDto {
   @IsUUID()
@@ -13,6 +13,13 @@ export class AnswerSubmittedDto {
   @IsBoolean()
   isCorrect: boolean;
 
-  @IsDateString()
+  @IsString()
   submittedAt: string;
+
+  @IsString()
+  deadline: string;
+
+  @IsOptional()
+  @IsNumber()
+  questionWeight?: number;
 }
