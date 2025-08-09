@@ -17,7 +17,10 @@ export class ScoringService {
     try {
       this.logger.log(`Processing answer for player ${answerData.playerId} in quiz ${answerData.quizId}`);
 
-      // Find or create player score record
+      // Calculate score based on correctness
+      const scoreToAdd = answerData.isCorrect ? 10 : 0;
+
+      // Find existing player score record
       let playerScore = await this.playerScoreRepository.findOne({
         where: {
           playerId: answerData.playerId,
@@ -25,35 +28,28 @@ export class ScoringService {
         },
       });
 
-      if (!playerScore) {
+      if (playerScore) {
+        // Increment existing score
+        playerScore.score += scoreToAdd;
+        await this.playerScoreRepository.save(playerScore);
+        
+        this.logger.log(
+          `Updated score for player ${answerData.playerId}: ${playerScore.score} points (added ${scoreToAdd})`
+        );
+      } else {
         // Create new player score record
         playerScore = this.playerScoreRepository.create({
           playerId: answerData.playerId,
           quizId: answerData.quizId,
-          totalScore: 0,
-          correctAnswers: 0,
-          totalAnswers: 0,
+          score: scoreToAdd,
         });
+
+        await this.playerScoreRepository.save(playerScore);
+        
+        this.logger.log(
+          `Created new score record for player ${answerData.playerId}: ${scoreToAdd} points`
+        );
       }
-
-      // Update scores
-      playerScore.totalAnswers += 1;
-      if (answerData.isCorrect) {
-        playerScore.correctAnswers += 1;
-        playerScore.totalScore += this.calculatePointsForCorrectAnswer();
-      }
-      
-      playerScore.lastAnsweredAt = new Date(answerData.submittedAt);
-
-      // Save updated score
-      await this.playerScoreRepository.save(playerScore);
-
-      this.logger.log(
-        `Updated score for player ${answerData.playerId}: ${playerScore.totalScore} points (${playerScore.correctAnswers}/${playerScore.totalAnswers} correct)`
-      );
-
-      // TODO: Publish score update event to Kafka
-      // await this.kafkaService.publishScoreUpdate(playerScore);
 
     } catch (error) {
       this.logger.error(`Error processing answer for player ${answerData.playerId}:`, error);
@@ -74,16 +70,10 @@ export class ScoringService {
     return this.playerScoreRepository.find({
       where: { quizId },
       order: {
-        totalScore: 'DESC',
-        lastAnsweredAt: 'ASC', // Earlier submission wins ties
+        score: 'DESC',
+        updatedAt: 'ASC', // Earlier update wins ties
       },
       take: limit,
     });
-  }
-
-  private calculatePointsForCorrectAnswer(): number {
-    // Simple scoring: 10 points per correct answer
-    // This could be enhanced with time-based scoring, difficulty multipliers, etc.
-    return 10;
   }
 }

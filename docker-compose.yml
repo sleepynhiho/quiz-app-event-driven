@@ -65,7 +65,7 @@ services:
     networks:
       - quiz-network
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -102,6 +102,53 @@ services:
         condition: service_healthy
     networks:
       - quiz-network
+  
+  pgadmin:
+    image: dpage/pgadmin4:8.7
+    container_name: quiz-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@quiz.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - quiz-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scoring-service:
+    build:
+      context: ./services/scoring-service
+      dockerfile: Dockerfile
+    container_name: quiz-scoring-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./services/scoring-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=quiz_app
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_CLIENT_ID=scoring-service
+      - KAFKA_GROUP_ID=scoring-service-group
+      - PORT=3003
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quiz-network
 
 
 volumes:
@@ -109,6 +156,9 @@ volumes:
     driver: local
   redis_data:
     driver: local
+  pgadmin_data:
+    driver: local
+
 
 networks:
   quiz-network:
