@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PlayerScore } from '../entities/player-score.entity';
 import { AnswerSubmittedDto } from '../dto/answer-submitted.dto';
+import { KafkaService } from './kafka.service';
 
 @Injectable()
 export class ScoringService {
@@ -17,6 +18,7 @@ export class ScoringService {
   constructor(
     @InjectRepository(PlayerScore)
     private readonly playerScoreRepository: Repository<PlayerScore>,
+    private readonly kafkaService: KafkaService,
   ) {}
 
   async processAnswerSubmitted(answerData: AnswerSubmittedDto): Promise<void> {
@@ -148,9 +150,12 @@ export class ScoringService {
       },
     });
 
+    let finalScore: number;
+
     if (playerScore) {
       // Increment existing score
       playerScore.score += scoreToAdd;
+      finalScore = playerScore.score;
       // updatedAt will be automatically updated by TypeORM's @UpdateDateColumn
       await this.playerScoreRepository.save(playerScore);
       
@@ -166,10 +171,33 @@ export class ScoringService {
       });
 
       await this.playerScoreRepository.save(playerScore);
+      finalScore = scoreToAdd;
       
       this.logger.log(
         `Created new score record for player ${playerId}: ${scoreToAdd} points`
       );
+    }
+
+    // Publish score.updated event to Kafka after successful DB update
+    try {
+      const scoreUpdateMessage = {
+        playerId,
+        quizId,
+        score: finalScore,
+      };
+
+      await this.kafkaService.publishMessage('score.updated', scoreUpdateMessage);
+      
+      this.logger.log(
+        `Published score.updated event for player ${playerId}: ${finalScore} points`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish score.updated event for player ${playerId}:`, 
+        error
+      );
+      // Note: We don't throw here as the DB operation succeeded
+      // In a production system, you might want to implement retry logic
     }
   }
 
