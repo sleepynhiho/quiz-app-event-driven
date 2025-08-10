@@ -1,0 +1,245 @@
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  padding: 20px;
+}
+
+.auth-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 450px;
+  border: 2px solid #f0f0f0;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.auth-header h2 {
+  color: #333;
+  margin: 0 0 10px 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.auth-header p {
+  color: #666;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1rem;
+}
+
+.auth-form input {
+  padding: 15px 18px;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #007bff;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.auth-form input::placeholder {
+  color: #adb5bd;
+}
+
+.error-message {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+  color: #721c24;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #dc3545;
+  font-weight: 500;
+  text-align: center;
+}
+
+.auth-submit-btn {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+  margin-top: 10px;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+.auth-submit-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: 25px;
+  padding-top: 25px;
+  border-top: 1px solid #e9ecef;
+}
+
+.auth-switch p {
+  color: #666;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.switch-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 8px;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.switch-btn:hover {
+  color: #0056b3;
+}
+
+.demo-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: linear-gradient(135deg, #e3f2fd, #f0f8ff);
+  border-radius: 10px;
+  border: 1px solid #bbdefb;
+  text-align: center;
+}
+
+.demo-text {
+  margin: 0 0 10px 0;
+  color: #1976d2;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.demo-btn {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.demo-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(33, 150, 243, 0.3);
+}
+
+.auth-note {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #17a2b8;
+}
+
+.auth-note p {
+  margin: 0;
+  color: #495057;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Success message (for later use) */
+.success-message {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
+  color: #155724;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #28a745;
+  font-weight: 500;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+/* Loading state */
+.auth-submit-btn:disabled {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .auth-container {
+    padding: 10px;
+    min-height: 70vh;
+  }
+  
+  .auth-card {
+    padding: 30px 20px;
+    max-width: 100%;
+  }
+  
+  .auth-header h2 {
+    font-size: 1.8rem;
+  }
+  
+  .auth-form input {
+    padding: 12px 15px;
+  }
+  
+  .auth-submit-btn {
+    padding: 14px 20px;
+    font-size: 1rem;
+  }
+}
+
+/* Animation for form transitions */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card {
+  animation: slideIn 0.5s ease-out;
+} 

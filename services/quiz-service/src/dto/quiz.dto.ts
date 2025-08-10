@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsNotEmpty } from 'class-validator';
+import { IsString, IsArray, IsNotEmpty, IsNumber } from 'class-validator';
 
 export class CreateQuizDto {
   @IsString()
@@ -19,9 +19,9 @@ export class CreateQuestionDto {
   @IsNotEmpty()
   options: string[];
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  correctAnswer: string;
+  correctAnswer: number;
 }
 
 export class StartQuizDto {

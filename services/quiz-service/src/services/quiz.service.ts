@@ -22,6 +22,159 @@ export class QuizService {
     private redisService: RedisService,
   ) {}
 
+  async getAllQuizzes(hostId?: string) {
+    const whereCondition = hostId ? { hostId } : {};
+    
+    const quizzes = await this.quizRepository.find({
+      where: whereCondition,
+      order: { createdAt: 'DESC' },
+    });
+
+    // Get question count separately for each quiz to avoid relation issues
+    const quizzesWithCount = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const questionCount = await this.questionRepository.count({
+          where: { quizId: quiz.id }
+        });
+        
+        return {
+          id: quiz.id,
+          title: quiz.title,
+          code: quiz.code,
+          hostId: quiz.hostId,
+          createdAt: quiz.createdAt,
+          questionsCount: questionCount,
+        };
+      })
+    );
+
+    return quizzesWithCount;
+  }
+
+  async getDemoQuiz(questionLimit?: number, randomize?: boolean) {
+    // Return a demo quiz with fresh IDs each time
+    const quizId = uuidv4(); // Generate new quiz ID each time
+    
+    // All available demo questions
+    let allQuestions = [
+      {
+        id: uuidv4(),
+        content: "Thủ đô của Việt Nam là gì?",
+        options: ["A) Hà Nội", "B) TP.HCM", "C) Đà Nẵng", "D) Huế"],
+        correctAnswer: 0, // Index của "A) Hà Nội"
+        order: 1,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "2 + 2 = ?",
+        options: ["A) 4", "B) 5", "C) 6", "D) 3"],
+        correctAnswer: 0, // Index của "A) 4"
+        order: 2,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "Ngôn ngữ lập trình nào được sử dụng để tạo React?",
+        options: ["A) JavaScript", "B) Python", "C) Java", "D) C++"],
+        correctAnswer: 0, // Index của "A) JavaScript"
+        order: 3,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "HTTP viết tắt của gì?",
+        options: ["A) HyperText Transfer Protocol", "B) Home Tool Transfer Protocol", "C) Hyperlink Text Protocol", "D) High Transfer Protocol"],
+        correctAnswer: 0, // Index của "A) HyperText Transfer Protocol"
+        order: 4,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "Microservices là gì?",
+        options: ["A) Kiến trúc phần mềm chia ứng dụng thành các service nhỏ", "B) Loại database", "C) Ngôn ngữ lập trình", "D) Framework frontend"],
+        correctAnswer: 0, // Index của "A) Kiến trúc phần mềm chia ứng dụng thành các service nhỏ"
+        order: 5,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "PostgreSQL là loại database gì?",
+        options: ["A) Relational Database", "B) NoSQL Database", "C) Graph Database", "D) Key-Value Store"],
+        correctAnswer: 0, // Index của "A) Relational Database"
+        order: 6,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "Kafka được sử dụng để làm gì?",
+        options: ["A) Message Streaming", "B) Web Server", "C) Database", "D) Authentication"],
+        correctAnswer: 0, // Index của "A) Message Streaming"
+        order: 7,
+        quizId: quizId
+      },
+      {
+        id: uuidv4(),
+        content: "Docker được dùng để?",
+        options: ["A) Containerization", "B) Database Management", "C) Web Development", "D) Machine Learning"],
+        correctAnswer: 0, // Index của "A) Containerization"
+        order: 8,
+        quizId: quizId
+      }
+    ];
+
+    // Apply randomization if requested
+    if (randomize) {
+      allQuestions = this.shuffleArray(allQuestions);
+      // Re-assign order after shuffle
+      allQuestions.forEach((q, index) => q.order = index + 1);
+    }
+
+    // Apply question limit if specified
+    const questions = questionLimit ? allQuestions.slice(0, questionLimit) : allQuestions;
+
+    const demoQuiz = {
+      id: quizId,
+      title: `Demo Quiz - ${randomize ? 'Random' : 'Standard'} (${questions.length} câu)`,
+      code: `DEMO${Date.now().toString().slice(-4)}`, // Dynamic code
+      hostId: 'demo-host-123',
+      createdAt: new Date().toISOString(),
+      questions: questions
+    };
+
+    return demoQuiz;
+  }
+
+  // Utility function to shuffle array
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  async getQuizWithQuestions(quizId: string) {
+    const quiz = await this.quizRepository.findOne({
+      where: { id: quizId }
+    });
+
+    if (!quiz) {
+      throw new Error('Quiz not found');
+    }
+
+    const questions = await this.questionRepository.find({
+      where: { quizId },
+      order: { order: 'ASC' }
+    });
+
+    return {
+      ...quiz,
+      questions
+    };
+  }
+
   async createQuiz(hostId: string, createQuizDto: CreateQuizDto): Promise<Quiz> {
     // Generate unique quiz code
     const code = this.generateQuizCode();
