@@ -1,8 +1,10 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   Param,
+  Query,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -12,6 +14,66 @@ import { CreateQuizDto } from '../dto/quiz.dto';
 @Controller('quiz')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
+
+  @Get()
+  async getAllQuizzes(@Query('hostId') hostId?: string) {
+    try {
+      const quizzes = await this.quizService.getAllQuizzes(hostId);
+      return {
+        success: true,
+        data: quizzes,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to get quizzes',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('demo')
+  async getDemoQuiz(
+    @Query('limit') limit?: string,
+    @Query('random') random?: string,
+  ) {
+    try {
+      const questionLimit = limit ? parseInt(limit) : undefined;
+      const randomize = random === 'true';
+      
+      const demoQuiz = await this.quizService.getDemoQuiz(questionLimit, randomize);
+      return demoQuiz;
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to get demo quiz',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':id')
+  async getQuiz(@Param('id') quizId: string) {
+    try {
+      const quiz = await this.quizService.getQuizWithQuestions(quizId);
+      return quiz;
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to get quiz',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
 
   @Post('create')
   async createQuiz(@Body() createQuizDto: CreateQuizDto) {

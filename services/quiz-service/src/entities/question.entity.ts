@@ -15,10 +15,10 @@ export class Question {
   @Column('jsonb')
   options: string[];
 
-  @Column()
-  correctAnswer: string;
+  @Column('integer', { name: 'correct_answer' })
+  correctAnswer: number;
 
-  @Column('integer')
+  @Column('integer', { default: 1 })
   order: number;
 
   @ManyToOne(() => Quiz, (quiz) => quiz.questions, { onDelete: 'CASCADE' })
