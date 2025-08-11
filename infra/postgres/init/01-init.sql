@@ -1,7 +1,7 @@
--- Database initialization script for Quiz App
--- This script creates the necessary tables and indexes
+-- Quiz App database initialization
+-- Creates core tables and indexes
 
--- Enable UUID extension
+-- Enable UUID support
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create quizzes table

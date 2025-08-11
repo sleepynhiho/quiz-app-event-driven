@@ -9,11 +9,11 @@ import { KafkaService } from './kafka.service';
 export class ScoringService {
   private readonly logger = new Logger(ScoringService.name);
   
-  // In-memory tracking for correct answer order per question
-  private correctAnswerOrder = new Map<string, string[]>(); // questionId -> [playerId1, playerId2, ...]
+  // Track correct answer order for bonus calculation
+  private correctAnswerOrder = new Map<string, string[]>();
   
-  // Cache for question start times (in a real app, this might come from Redis or database)
-  private questionStartTimes = new Map<string, Date>(); // questionId -> start time
+  // Cache question start times for time bonus calculation
+  private questionStartTimes = new Map<string, Date>();
 
   constructor(
     @InjectRepository(PlayerScore)
@@ -39,24 +39,24 @@ export class ScoringService {
   }
 
   private calculateScore(answerData: AnswerSubmittedDto): number {
-    // If answer is incorrect, score is 0
+    // No points for incorrect answers
     if (!answerData.isCorrect) {
       this.logger.log(`Incorrect answer for player ${answerData.playerId} - score: 0`);
       return 0;
     }
 
-    // Default question weight to 1 if not provided
+    // Apply question weight (default: 1)
     const questionWeight = answerData.questionWeight || 1;
     
-    // Base score calculation
+    // Calculate base score
     const baseScore = 100 * questionWeight;
     this.logger.log(`Base score: ${baseScore} (100 * ${questionWeight})`);
 
-    // Time bonus calculation
+    // Calculate time bonus
     const timeBonus = this.calculateTimeBonus(answerData);
     this.logger.log(`Time bonus: ${timeBonus}`);
 
-    // Order bonus calculation
+    // Calculate order bonus
     const orderBonus = this.calculateOrderBonus(answerData);
     this.logger.log(`Order bonus: ${orderBonus}`);
 
@@ -71,24 +71,22 @@ export class ScoringService {
       const submittedAt = new Date(answerData.submittedAt);
       const deadline = new Date(answerData.deadline);
       
-      // For time bonus calculation, we need the question start time
-      // In a real implementation, this would be stored when the question is presented
-      // For now, we'll estimate it as deadline - 30 seconds (typical question duration)
-      const questionDuration = 30 * 1000; // 30 seconds in milliseconds
+      // Estimate question start time from deadline
+      const questionDuration = 30 * 1000; // 30 seconds
       const questionPresentedAt = new Date(deadline.getTime() - questionDuration);
       
-      // Store the question start time for future reference
+      // Cache start time for reference
       this.questionStartTimes.set(answerData.questionId, questionPresentedAt);
 
       const totalQuestionTime = deadline.getTime() - questionPresentedAt.getTime();
       const timeRemaining = deadline.getTime() - submittedAt.getTime();
       
       if (timeRemaining <= 0 || totalQuestionTime <= 0) {
-        return 0; // No bonus if submitted after deadline or invalid times
+        return 0; // No bonus for late or invalid submissions
       }
 
       const timeRatio = timeRemaining / totalQuestionTime;
-      const timeBonus = Math.floor(timeRatio * 50); // Round down as requested
+      const timeBonus = Math.floor(timeRatio * 50); // Max 50 points, rounded down
       
       return Math.max(0, timeBonus);
     } catch (error) {
@@ -101,20 +99,20 @@ export class ScoringService {
     const questionId = answerData.questionId;
     const playerId = answerData.playerId;
 
-    // Get current correct answers for this question
+    // Get correct answers list for this question
     let correctAnswers = this.correctAnswerOrder.get(questionId) || [];
     
-    // Check if this player already answered correctly (avoid duplicates)
+    // Prevent duplicate bonus for same player
     if (correctAnswers.includes(playerId)) {
       this.logger.log(`Player ${playerId} already answered question ${questionId} correctly`);
       return 0;
     }
 
-    // Add this player to the correct answers list
+    // Add player to correct answers sequence
     correctAnswers.push(playerId);
     this.correctAnswerOrder.set(questionId, correctAnswers);
 
-    // Determine order bonus
+    // Calculate position-based bonus
     const position = correctAnswers.length;
     let orderBonus = 0;
     

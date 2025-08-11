@@ -3,24 +3,24 @@ import { publishPlayerJoined } from '../utils/kafka.js';
 
 export class QuizService {
   static async joinQuiz(playerId, quizId) {
-    // Check if player already joined this quiz
+    // Prevent duplicate joins
     const existingJoin = await PlayerQuiz.findByPlayerAndQuiz(playerId, quizId);
     if (existingJoin) {
       throw new Error('Player has already joined this quiz');
     }
 
-    // Create player quiz record
+    // Create join record
     const playerQuiz = await PlayerQuiz.create({
       playerId,
       quizId,
     });
 
-    // Publish Kafka message (don't fail the request if Kafka is down)
+    // Publish join event (non-blocking)
     try {
       await publishPlayerJoined(playerId, quizId);
     } catch (error) {
       console.error('Failed to publish Kafka message:', error);
-      // Don't throw error, just log it - the quiz join should still succeed
+      // Continue - join should succeed even if event fails
     }
 
     return playerQuiz;

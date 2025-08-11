@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,6 +8,7 @@ import { QuizPlayer } from '../entities/quiz-player.entity';
 import { CreateQuizDto } from '../dto/quiz.dto';
 import { KafkaService } from './kafka.service';
 import { RedisService } from './redis.service';
+import { QuizGateway } from '../gateways/quiz.gateway';
 
 @Injectable()
 export class QuizService {
@@ -18,8 +19,11 @@ export class QuizService {
     private questionRepository: Repository<Question>,
     @InjectRepository(QuizPlayer)
     private quizPlayerRepository: Repository<QuizPlayer>,
+    @Inject(forwardRef(() => KafkaService))
     private kafkaService: KafkaService,
     private redisService: RedisService,
+    @Inject(forwardRef(() => QuizGateway))
+    private quizGateway: QuizGateway,
   ) {}
 
   async getAllQuizzes(hostId?: string) {
@@ -52,16 +56,16 @@ export class QuizService {
   }
 
   async getDemoQuiz(questionLimit?: number, randomize?: boolean) {
-    // Return a demo quiz with fresh IDs each time
-    const quizId = uuidv4(); // Generate new quiz ID each time
+    // Generate fresh demo quiz with unique IDs
+    const quizId = uuidv4();
     
-    // All available demo questions
+    // Demo questions dataset
     let allQuestions = [
       {
         id: uuidv4(),
-        content: "Thủ đô của Việt Nam là gì?",
-        options: ["A) Hà Nội", "B) TP.HCM", "C) Đà Nẵng", "D) Huế"],
-        correctAnswer: 0, // Index của "A) Hà Nội"
+        content: "What is the capital of Vietnam?",
+        options: ["A) Hanoi", "B) Ho Chi Minh City", "C) Da Nang", "D) Hue"],
+        correctAnswer: 0, // A) Hanoi
         order: 1,
         quizId: quizId
       },
@@ -69,31 +73,31 @@ export class QuizService {
         id: uuidv4(),
         content: "2 + 2 = ?",
         options: ["A) 4", "B) 5", "C) 6", "D) 3"],
-        correctAnswer: 0, // Index của "A) 4"
+        correctAnswer: 0, // A) 4
         order: 2,
         quizId: quizId
       },
       {
         id: uuidv4(),
-        content: "Ngôn ngữ lập trình nào được sử dụng để tạo React?",
+        content: "Which programming language is used to create React?",
         options: ["A) JavaScript", "B) Python", "C) Java", "D) C++"],
-        correctAnswer: 0, // Index của "A) JavaScript"
+        correctAnswer: 0, // A) JavaScript
         order: 3,
         quizId: quizId
       },
       {
         id: uuidv4(),
-        content: "HTTP viết tắt của gì?",
+        content: "What does HTTP stand for?",
         options: ["A) HyperText Transfer Protocol", "B) Home Tool Transfer Protocol", "C) Hyperlink Text Protocol", "D) High Transfer Protocol"],
-        correctAnswer: 0, // Index của "A) HyperText Transfer Protocol"
+        correctAnswer: 0, // A) HyperText Transfer Protocol
         order: 4,
         quizId: quizId
       },
       {
         id: uuidv4(),
-        content: "Microservices là gì?",
-        options: ["A) Kiến trúc phần mềm chia ứng dụng thành các service nhỏ", "B) Loại database", "C) Ngôn ngữ lập trình", "D) Framework frontend"],
-        correctAnswer: 0, // Index của "A) Kiến trúc phần mềm chia ứng dụng thành các service nhỏ"
+        content: "What are Microservices?",
+        options: ["A) Software architecture that divides apps into small services", "B) Type of database", "C) Programming language", "D) Frontend framework"],
+        correctAnswer: 0, // A) Software architecture
         order: 5,
         quizId: quizId
       },
@@ -135,8 +139,8 @@ export class QuizService {
 
     const demoQuiz = {
       id: quizId,
-      title: `Demo Quiz - ${randomize ? 'Random' : 'Standard'} (${questions.length} câu)`,
-      code: `DEMO${Date.now().toString().slice(-4)}`, // Dynamic code
+      title: `Demo Quiz - ${randomize ? 'Random' : 'Standard'} (${questions.length} questions)`,
+      code: `DEMO${Date.now().toString().slice(-4)}`, // Dynamic demo code
       hostId: 'demo-host-123',
       createdAt: new Date().toISOString(),
       questions: questions
@@ -145,7 +149,7 @@ export class QuizService {
     return demoQuiz;
   }
 
-  // Utility function to shuffle array
+  // Fisher-Yates shuffle algorithm
   private shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -179,7 +183,7 @@ export class QuizService {
     // Generate unique quiz code
     const code = this.generateQuizCode();
     
-    // Create quiz
+    // Create quiz entity
     const quiz = this.quizRepository.create({
       id: uuidv4(),
       hostId,
@@ -189,7 +193,7 @@ export class QuizService {
     
     const savedQuiz = await this.quizRepository.save(quiz);
 
-    // Create questions
+    // Create question entities
     const questions = createQuizDto.questions.map((questionDto, index) => {
       return this.questionRepository.create({
         id: uuidv4(),
@@ -216,17 +220,20 @@ export class QuizService {
       throw new Error('Quiz not found');
     }
 
-    // Set quiz as started in Redis
+    // Initialize quiz state in Redis
     await this.redisService.setJson(`quiz:${quizId}:state`, {
       status: 'started',
       currentQuestionIndex: 0,
       startedAt: new Date(),
     });
 
-    // Publish quiz started event
+    // Publish to Kafka
     await this.kafkaService.publish('quiz.started', { quizId });
 
-    // Start with first question
+    // Broadcast to WebSocket clients
+    this.quizGateway.broadcastToQuiz(quizId, 'quiz.started', { quizId });
+
+    // Present first question
     await this.presentNextQuestion(quizId);
   }
 
@@ -249,15 +256,15 @@ export class QuizService {
     const questions = quiz.questions.sort((a, b) => a.order - b.order);
 
     if (currentIndex >= questions.length) {
-      // Quiz ended
+      // No more questions - end quiz
       await this.endQuiz(quizId);
       return;
     }
 
     const currentQuestion = questions[currentIndex];
-    const deadline = new Date(Date.now() + 30000); // 30 seconds
+    const deadline = new Date(Date.now() + 30000); // 30 second timer
 
-    // Update quiz state
+    // Update state with current question
     await this.redisService.setJson(`quiz:${quizId}:state`, {
       ...quizState,
       currentQuestionIndex: currentIndex,
@@ -265,16 +272,22 @@ export class QuizService {
       questionDeadline: deadline,
     });
 
-    // Publish question presented event
-    await this.kafkaService.publish('question.presented', {
+    // Prepare question data
+    const questionData = {
       quizId,
       questionId: currentQuestion.id,
       content: currentQuestion.content,
       options: currentQuestion.options,
       deadline,
-    });
+    };
+    
+    // Publish to Kafka
+    await this.kafkaService.publish('question.presented', questionData);
 
-    // Schedule time up event
+    // Broadcast to WebSocket clients
+    this.quizGateway.broadcastToQuiz(quizId, 'question.presented', questionData);
+
+    // Schedule timeout
     setTimeout(() => {
       this.timeUp(quizId, currentQuestion.id);
     }, 30000);
@@ -286,7 +299,7 @@ export class QuizService {
       throw new Error('Quiz not started');
     }
 
-    // Move to next question
+    // Increment question index
     quizState.currentQuestionIndex += 1;
     await this.redisService.setJson(`quiz:${quizId}:state`, quizState);
 
@@ -294,11 +307,15 @@ export class QuizService {
   }
 
   private async timeUp(quizId: string, questionId: string): Promise<void> {
-    await this.kafkaService.publish('time.up', { quizId, questionId });
+    const timeUpData = { quizId, questionId };
+    await this.kafkaService.publish('time.up', timeUpData);
+    
+    // Broadcast to WebSocket clients
+    this.quizGateway.broadcastToQuiz(quizId, 'time.up', timeUpData);
   }
 
   private async endQuiz(quizId: string): Promise<void> {
-    // Get final scores
+    // Collect final scores
     const players = await this.quizPlayerRepository.find({
       where: { quizId },
     });
@@ -308,14 +325,16 @@ export class QuizService {
       score: player.score,
     }));
 
-    // Update quiz state
+    // Mark quiz as ended
     await this.redisService.setJson(`quiz:${quizId}:state`, {
       status: 'ended',
       endedAt: new Date(),
     });
 
-    // Publish quiz ended event
-    await this.kafkaService.publish('quiz.ended', { quizId, result });
+    // Publish and broadcast end event
+    const endData = { quizId, result };
+    await this.kafkaService.publish('quiz.ended', endData);
+    this.quizGateway.broadcastToQuiz(quizId, 'quiz.ended', endData);
   }
 
   private generateQuizCode(): string {
@@ -331,5 +350,19 @@ export class QuizService {
       where: { id },
       relations: ['questions', 'players'],
     });
+  }
+
+  async getQuestionById(questionId: string): Promise<Question | null> {
+    return await this.questionRepository.findOne({
+      where: { id: questionId },
+    });
+  }
+
+  async getQuizState(quizId: string): Promise<any> {
+    const state = await this.redisService.getJson<any>(`quiz:${quizId}:state`);
+    if (!state) {
+      throw new Error('Quiz state not found');
+    }
+    return state;
   }
 }

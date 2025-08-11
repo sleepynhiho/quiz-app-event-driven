@@ -14,11 +14,11 @@ import {
   QuizWithQuestions
 } from '../types';
 
-// API base URLs
-const USER_SERVICE_URL = 'http://localhost:3000';
-const QUIZ_SERVICE_URL = 'http://localhost:3001/api';
-const ANSWER_SERVICE_URL = 'http://localhost:3002/api';
-const SCORING_SERVICE_URL = 'http://localhost:3003/api';
+// API base URLs - updated for Docker Compose
+const USER_SERVICE_URL = process.env.NODE_ENV === 'production' ? '/api/auth' : 'http://localhost:3004';
+const QUIZ_SERVICE_URL = process.env.NODE_ENV === 'production' ? '/api/quiz' : 'http://localhost:3001/api';
+const ANSWER_SERVICE_URL = process.env.NODE_ENV === 'production' ? '/api/answer' : 'http://localhost:3002/api';
+const SCORING_SERVICE_URL = process.env.NODE_ENV === 'production' ? '/api/scores' : 'http://localhost:3003/api';
 
 // Create axios instance with default config
 const api = axios.create({

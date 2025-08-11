@@ -120,6 +120,30 @@ services:
       postgres:
         condition: service_healthy
 
+  # User service with authentication
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: quiz-user-service
+    restart: unless-stopped
+    ports:
+      - "3004:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/quiz_app
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_CLIENT_ID=user-service
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quiz-network
+
   scoring-service:
     build:
       context: ./services/scoring-service
@@ -150,6 +174,86 @@ services:
     networks:
       - quiz-network
 
+  quiz-service:
+    build:
+      context: ./services/quiz-service
+      dockerfile: Dockerfile
+    container_name: quiz-quiz-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./services/quiz-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=quiz_app
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_CLIENT_ID=quiz-service
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redispassword
+      - PORT=3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quiz-network
+
+  answer-service:
+    build:
+      context: ./services/answer-service
+      dockerfile: Dockerfile
+    container_name: quiz-answer-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./services/answer-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=quiz_app
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_CLIENT_ID=answer-service
+      - QUIZ_SERVICE_URL=http://quiz-service:3001
+      - PORT=3002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quiz-network
+
+  # Frontend service with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: quiz-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - user-service
+      - quiz-service
+      - answer-service
+      - scoring-service
+    networks:
+      - quiz-network
 
 volumes:
   postgres_data:

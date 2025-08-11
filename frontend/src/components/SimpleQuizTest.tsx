@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { answerApi, scoringApi, quizApi } from '../services/api';
 import { Answer, PlayerScore, User, Question, QuizWithQuestions, Quiz } from '../types';
+import websocketService from '../services/websocket';
 import './SimpleQuizTest.css';
 
 interface SimpleQuizTestProps {
@@ -33,12 +34,79 @@ const SimpleQuizTest: React.FC<SimpleQuizTestProps> = ({ user }) => {
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  // Load available quizzes on mount
+  // Load available quizzes and setup WebSocket on mount
   useEffect(() => {
     loadAvailableQuizzes();
+    
+    // Initialize WebSocket connection
+    websocketService.connect();
+    
+    // Define event handlers
+    const handleQuizStarted = (data: any) => {
+      console.log('Quiz started:', data);
+      alert('Quiz has started!');
+    };
+
+    const handleQuestionPresented = (data: any) => {
+      console.log('New question presented:', data);
+      // Show alert for current quiz
+      if (data.quizId === quiz?.id) {
+        alert(`New question: ${data.content}`);
+      }
+    };
+
+    const handleTimeUp = (data: any) => {
+      console.log('Time up for question:', data);
+      if (data.quizId === quiz?.id && data.questionId === currentQuestion?.id) {
+        alert('Time is up for this question!');
+        setAnswer(''); // Reset answer input
+      }
+    };
+
+    const handleScoreUpdated = (data: any) => {
+      console.log('Score updated:', data);
+      // Update leaderboard
+      if (data.quizId === quiz?.id) {
+        loadScores();
+      }
+    };
+
+    const handlePlayerJoined = (data: any) => {
+      console.log('Player joined:', data);
+      if (data.quizId === quiz?.id) {
+        // Optional: show join notification
+      }
+    };
+
+    const handleQuizEnded = (data: any) => {
+      console.log('Quiz ended:', data);
+      if (data.quizId === quiz?.id) {
+        alert('Quiz has ended! Check the final results.');
+        loadScores(); // Show final leaderboard
+      }
+    };
+
+    // Register event listeners
+    websocketService.on('quiz.started', handleQuizStarted);
+    websocketService.on('question.presented', handleQuestionPresented);
+    websocketService.on('time.up', handleTimeUp);
+    websocketService.on('score.updated', handleScoreUpdated);
+    websocketService.on('player.joined', handlePlayerJoined);
+    websocketService.on('quiz.ended', handleQuizEnded);
+
+    // Cleanup listeners on unmount
+    return () => {
+      websocketService.off('quiz.started', handleQuizStarted);
+      websocketService.off('question.presented', handleQuestionPresented);
+      websocketService.off('time.up', handleTimeUp);
+      websocketService.off('score.updated', handleScoreUpdated);
+      websocketService.off('player.joined', handlePlayerJoined);
+      websocketService.off('quiz.ended', handleQuizEnded);
+      websocketService.disconnect();
+    };
   }, []);
 
-  // Load quiz from API on component mount and when user or selection changes
+  // Load quiz data when user or selection changes
   useEffect(() => {
     const initQuiz = async () => {
       if (selectedQuizId === 'demo') {
@@ -46,7 +114,7 @@ const SimpleQuizTest: React.FC<SimpleQuizTestProps> = ({ user }) => {
       } else {
         await loadSelectedQuiz(selectedQuizId);
       }
-      // Reset all states when user changes
+      // Reset component state
       setCurrentQuestionIndex(0);
       setAnswer('');
       setLastResult(null);
@@ -55,7 +123,14 @@ const SimpleQuizTest: React.FC<SimpleQuizTestProps> = ({ user }) => {
     };
     initQuiz();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id, selectedQuizId, questionLimit, randomize]); // Add dependencies
+  }, [user.id, selectedQuizId, questionLimit, randomize]);
+
+  // Join quiz room for real-time updates
+  useEffect(() => {
+    if (quiz?.id && websocketService.isConnected()) {
+      websocketService.joinQuiz(quiz.id, currentPlayer);
+    }
+  }, [quiz?.id, currentPlayer]);
 
   const loadAvailableQuizzes = async () => {
     try {
@@ -63,6 +138,17 @@ const SimpleQuizTest: React.FC<SimpleQuizTestProps> = ({ user }) => {
       setAvailableQuizzes(quizzes);
     } catch (error) {
       console.error('Error loading available quizzes:', error);
+    }
+  };
+
+  const loadScores = async () => {
+    if (!quiz?.id) return;
+    
+    try {
+      const leaderboard = await scoringApi.getLeaderboard(quiz.id);
+      setScores(leaderboard);
+    } catch (error) {
+      console.error('Error loading scores:', error);
     }
   };
 

@@ -75,6 +75,38 @@ export class QuizController {
     }
   }
 
+  @Get('question/:questionId')
+  async getQuestion(@Param('questionId') questionId: string) {
+    try {
+      const question = await this.quizService.getQuestionById(questionId);
+      if (!question) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Question not found',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      return {
+        success: true,
+        data: question,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to get question',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Post('create')
   async createQuiz(@Body() createQuizDto: CreateQuizDto) {
     try {
@@ -136,6 +168,26 @@ export class QuizController {
           error: error instanceof Error ? error.message : 'Unknown error',
         },
         HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Get(':id/state')
+  async getQuizState(@Param('id') quizId: string) {
+    try {
+      const state = await this.quizService.getQuizState(quizId);
+      return {
+        success: true,
+        data: state,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to get quiz state',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.NOT_FOUND,
       );
     }
   }

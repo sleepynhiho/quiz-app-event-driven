@@ -5,6 +5,7 @@ import { Answer } from '../entities/answer.entity';
 import { SubmitAnswerDto } from '../dto/submit-answer.dto';
 import { AnswerSubmittedDto } from '../dto/answer-submitted.dto';
 import { KafkaService } from './kafka.service';
+import axios from 'axios';
 
 @Injectable()
 export class AnswerService {
@@ -19,7 +20,7 @@ export class AnswerService {
   async submitAnswer(submitAnswerDto: SubmitAnswerDto): Promise<Answer> {
     const { playerId, quizId, questionId, answer } = submitAnswerDto;
 
-    // Check if player already answered this question
+    // Prevent duplicate answers
     const existingAnswer = await this.answerRepository.findOne({
       where: {
         playerId,
@@ -32,14 +33,16 @@ export class AnswerService {
       throw new BadRequestException('Player has already answered this question');
     }
 
-    // TODO: Validate if quiz is active and question is current
-    // TODO: Validate if submission is within time limit
-    // For now, we'll assume these validations are done
+    // Validate quiz state and current question
+    const quizState = await this.validateQuizState(quizId, questionId);
+    
+    // Check submission deadline
+    await this.validateSubmissionTime(quizId, questionId);
 
-    // Get correct answer from Quiz Service (simplified for now)
+    // Validate answer correctness
     const isCorrect = await this.validateAnswer(questionId, answer);
 
-    // Save answer to database
+    // Store answer in database
     const newAnswer = this.answerRepository.create({
       playerId,
       quizId,
@@ -51,13 +54,14 @@ export class AnswerService {
 
     const savedAnswer = await this.answerRepository.save(newAnswer);
 
-    // Publish answer.submitted event to Kafka
+    // Publish to Kafka for scoring
     const answerSubmittedEvent: AnswerSubmittedDto = {
       playerId,
       quizId,
       questionId,
       isCorrect,
       submittedAt: savedAnswer.submittedAt.toISOString(),
+      deadline: quizState?.questionDeadline || new Date(Date.now() + 30000).toISOString(),
     };
 
     await this.kafkaService.publishMessage('answer.submitted', answerSubmittedEvent);
@@ -90,17 +94,79 @@ export class AnswerService {
     });
   }
 
-  // TODO: This should call Quiz Service to get the correct answer
+  private async validateQuizState(quizId: string, questionId: string): Promise<any> {
+    try {
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/${quizId}/state`);
+      
+      const result = response.data;
+      const quizState = result.data || result;
+      
+      if (quizState.status !== 'started' && quizState.status !== 'active') {
+        throw new BadRequestException('Quiz is not active');
+      }
+      
+      if (quizState.currentQuestionId !== questionId) {
+        throw new BadRequestException('Question is not currently active');
+      }
+
+      return quizState;
+    } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error.response?.status === 404) {
+        throw new BadRequestException('Quiz not found or not active');
+      }
+      this.logger.warn(`Failed to validate quiz state: ${error.message}`);
+      return null;
+    }
+  }
+
+  private async validateSubmissionTime(quizId: string, questionId: string): Promise<void> {
+    try {
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/${quizId}/state`);
+      
+      if (response.status === 200) {
+        const result = response.data;
+        const quizState = result.data || result;
+        
+        if (quizState.questionDeadline) {
+          const deadline = new Date(quizState.questionDeadline);
+          const now = new Date();
+          
+          if (now > deadline) {
+            throw new BadRequestException('Submission time has expired');
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.warn(`Failed to validate submission time: ${error.message}`);
+    }
+  }
+
   private async validateAnswer(questionId: string, answer: string): Promise<boolean> {
-    // Simplified validation - in real implementation, this should:
-    // 1. Call Quiz Service API to get question details
-    // 2. Compare submitted answer with correct answer
-    // 3. Handle different question types (multiple choice, text, etc.)
-    
-    // For now, return a mock validation
-    this.logger.warn('Using mock answer validation - implement Quiz Service integration');
-    
-    // Mock: assume answers starting with 'A' or 'a' are correct
-    return answer.toLowerCase().startsWith('a');
+    try {
+      // Get question from Quiz Service
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/question/${questionId}`);
+      
+      const questionResponse = response.data;
+      const question = questionResponse.data || questionResponse;
+      
+      // Convert letter to index (A=0, B=1, C=2, D=3)
+      const answerIndex = answer.toUpperCase().charCodeAt(0) - 65;
+      
+      // Check correctness
+      return answerIndex === question.correctAnswer;
+    } catch (error: any) {
+      this.logger.error(`Error validating answer for question ${questionId}:`, error.message || error);
+      // Fallback validation
+      return answer.toLowerCase().startsWith('a');
+    }
   }
 } 

@@ -1,7 +1,7 @@
--- Quiz App Database Schema
--- Run this SQL script to create the database schema
+-- Quiz App extended schema
+-- Additional tables and modifications
 
--- Create quizzes table (if not exists from previous initialization)
+-- Quizzes table (extends base schema)
 CREATE TABLE IF NOT EXISTS quizzes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     host_id UUID NOT NULL,
@@ -10,18 +10,17 @@ CREATE TABLE IF NOT EXISTS quizzes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create questions table (if not exists from previous initialization)
--- Note: This may already exist from 01-init.sql, so we only add missing columns
+-- Questions table (may exist from init script)
 CREATE TABLE IF NOT EXISTS questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     quiz_id UUID NOT NULL,
     content TEXT NOT NULL,
     options JSONB NOT NULL,
-    correct_answer VARCHAR(255) NOT NULL,
+    correct_answer INTEGER NOT NULL,
     FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
--- Add order column if it doesn't exist
+-- Add order column for question sequencing
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
@@ -30,7 +29,7 @@ BEGIN
     END IF;
 END $$;
 
--- Create quiz_players table
+-- Quiz players junction table
 CREATE TABLE IF NOT EXISTS quiz_players (
     quiz_id UUID NOT NULL,
     player_id UUID NOT NULL,
@@ -39,9 +38,18 @@ CREATE TABLE IF NOT EXISTS quiz_players (
     FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
--- Create indexes for better performance
+-- Player quiz joins for User Service
+CREATE TABLE IF NOT EXISTS player_quiz (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID NOT NULL,
+    quiz_id UUID NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(player_id, quiz_id)
+);
+
+-- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id);
--- Only create order index if column exists
+-- Order index (conditional)
 DO $$ 
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns 
@@ -54,3 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_quiz_players_quiz_id ON quiz_players(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_players_player_id ON quiz_players(player_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_code ON quizzes(code);
 CREATE INDEX IF NOT EXISTS idx_quizzes_host_id ON quizzes(host_id);
+
+-- Player quiz table indexes
+CREATE INDEX IF NOT EXISTS idx_player_quiz_player_id ON player_quiz(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_quiz_quiz_id ON player_quiz(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_player_quiz_joined_at ON player_quiz(joined_at);

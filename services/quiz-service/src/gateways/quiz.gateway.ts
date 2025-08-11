@@ -4,6 +4,9 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -50,5 +53,24 @@ export class QuizGateway
   leaveQuizRoom(client: Socket, quizId: string) {
     client.leave(`quiz-${quizId}`);
     console.log(`Client ${client.id} left quiz room: quiz-${quizId}`);
+  }
+
+  // WebSocket message handlers
+  @SubscribeMessage('join-quiz')
+  handleJoinQuiz(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { quizId: string; playerId: string },
+  ) {
+    this.joinQuizRoom(client, data.quizId);
+    client.emit('joined-quiz', { quizId: data.quizId, success: true });
+  }
+
+  @SubscribeMessage('leave-quiz')
+  handleLeaveQuiz(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { quizId: string },
+  ) {
+    this.leaveQuizRoom(client, data.quizId);
+    client.emit('left-quiz', { quizId: data.quizId, success: true });
   }
 }
