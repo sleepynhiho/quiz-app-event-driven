@@ -16,4 +16,4 @@ export class SubmitAnswerDto {
   @IsString()
   @IsNotEmpty()
   answer: string;
-} 
+}

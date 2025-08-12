@@ -1,0 +1,18 @@
+
+> user-service@1.0.0 start
+> node src/app.js
+
+{"level":"WARN","timestamp":"2025-08-10T12:11:08.651Z","logger":"kafkajs","message":"KafkaJS v2.0.0 switched default partitioner. To retain the same partitioning behavior as in previous versions, create the producer with the option \"createPartitioner: Partitioners.LegacyPartitioner\". See the migration guide at https://kafka.js.org/docs/migration-guide-v2.0.0#producer-new-default-partitioner for details. Silence this warning by setting the environment variable \"KAFKAJS_NO_PARTITIONER_WARNING=1\""}
+Failed to start server: PrismaClientInitializationError: error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider = "postgresql"
+10 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (/Users/tung.tranduc.int/Desktop/school/quiz-app-event-driven/services/user-service/node_modules/@prisma/client/runtime/library.js:112:2488)
+    at async startServer (file:///Users/tung.tranduc.int/Desktop/school/quiz-app-event-driven/services/user-service/src/app.js:92:5) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}

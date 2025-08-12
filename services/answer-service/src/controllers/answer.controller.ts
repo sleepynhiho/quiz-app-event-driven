@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, Param, ValidationPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  ValidationPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AnswerService } from '../services/answer.service';
 import { SubmitAnswerDto } from '../dto/submit-answer.dto';
 import { Answer } from '../entities/answer.entity';
@@ -9,7 +18,9 @@ export class AnswerController {
 
   @Post('submit')
   @HttpCode(HttpStatus.CREATED)
-  async submitAnswer(@Body(ValidationPipe) submitAnswerDto: SubmitAnswerDto): Promise<Answer> {
+  async submitAnswer(
+    @Body(ValidationPipe) submitAnswerDto: SubmitAnswerDto,
+  ): Promise<Answer> {
     return this.answerService.submitAnswer(submitAnswerDto);
   }
 
@@ -22,7 +33,9 @@ export class AnswerController {
   }
 
   @Get('question/:questionId')
-  async getQuestionAnswers(@Param('questionId') questionId: string): Promise<Answer[]> {
+  async getQuestionAnswers(
+    @Param('questionId') questionId: string,
+  ): Promise<Answer[]> {
     return this.answerService.getQuestionAnswers(questionId);
   }
-} 
+}
