@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { Kafka, Producer } from 'kafkajs';
 
 @Injectable()
@@ -52,4 +57,4 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
   }
-} 
+}

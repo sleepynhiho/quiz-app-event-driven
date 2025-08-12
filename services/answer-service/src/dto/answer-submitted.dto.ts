@@ -5,4 +5,4 @@ export class AnswerSubmittedDto {
   isCorrect: boolean;
   submittedAt: string; // ISO timestamp
   deadline: string; // ISO timestamp
-} 
+}
