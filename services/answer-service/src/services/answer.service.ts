@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -33,15 +30,12 @@ export class AnswerService {
     });
 
     if (existingAnswer) {
-      throw new BadRequestException(
-        'Player has already answered this question',
-      );
+      throw new BadRequestException('Player has already answered this question');
     }
 
     // Validate quiz state and current question
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const quizState = await this.validateQuizState(quizId, questionId);
-
+    
     // Check submission deadline
     await this.validateSubmissionTime(quizId, questionId);
 
@@ -67,21 +61,12 @@ export class AnswerService {
       questionId,
       isCorrect,
       submittedAt: savedAnswer.submittedAt.toISOString(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      deadline:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        quizState?.questionDeadline ||
-        new Date(Date.now() + 30000).toISOString(),
+      deadline: quizState?.questionDeadline || new Date(Date.now() + 30000).toISOString(),
     };
 
-    await this.kafkaService.publishMessage(
-      'answer.submitted',
-      answerSubmittedEvent,
-    );
+    await this.kafkaService.publishMessage('answer.submitted', answerSubmittedEvent);
 
-    this.logger.log(
-      `Answer submitted by player ${playerId} for question ${questionId}`,
-    );
+    this.logger.log(`Answer submitted by player ${playerId} for question ${questionId}`);
 
     return savedAnswer;
   }
@@ -109,29 +94,18 @@ export class AnswerService {
     });
   }
 
-  private async validateQuizState(
-    quizId: string,
-    questionId: string,
-  ): Promise<any> {
+  private async validateQuizState(quizId: string, questionId: string): Promise<any> {
     try {
-      const quizServiceUrl =
-        process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      const response = await axios.get(
-        `${quizServiceUrl}/api/quiz/${quizId}/state`,
-      );
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/${quizId}/state`);
+      
       const result = response.data;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const quizState = result.data || result;
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      
       if (quizState.status !== 'started' && quizState.status !== 'active') {
         throw new BadRequestException('Quiz is not active');
       }
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      
       if (quizState.currentQuestionId !== questionId) {
         throw new BadRequestException('Question is not currently active');
       }
@@ -141,7 +115,6 @@ export class AnswerService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.response?.status === 404) {
         throw new BadRequestException('Quiz not found or not active');
       }
@@ -150,26 +123,19 @@ export class AnswerService {
     }
   }
 
-  private async validateSubmissionTime(
-    quizId: string,
-    questionId: string,
-  ): Promise<void> {
+  private async validateSubmissionTime(quizId: string, questionId: string): Promise<void> {
     try {
-      const quizServiceUrl =
-        process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
-      const response = await axios.get(
-        `${quizServiceUrl}/api/quiz/${quizId}/state`,
-      );
-
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/${quizId}/state`);
+      
       if (response.status === 200) {
         const result = response.data;
         const quizState = result.data || result;
-
+        
         if (quizState.questionDeadline) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const deadline = new Date(quizState.questionDeadline);
           const now = new Date();
-
+          
           if (now > deadline) {
             throw new BadRequestException('Submission time has expired');
           }
@@ -183,33 +149,24 @@ export class AnswerService {
     }
   }
 
-  private async validateAnswer(
-    questionId: string,
-    answer: string,
-  ): Promise<boolean> {
+  private async validateAnswer(questionId: string, answer: string): Promise<boolean> {
     try {
       // Get question from Quiz Service
-      const quizServiceUrl =
-        process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
-      const response = await axios.get(
-        `${quizServiceUrl}/api/quiz/question/${questionId}`,
-      );
-
+      const quizServiceUrl = process.env.QUIZ_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${quizServiceUrl}/api/quiz/question/${questionId}`);
+      
       const questionResponse = response.data;
       const question = questionResponse.data || questionResponse;
-
+      
       // Convert letter to index (A=0, B=1, C=2, D=3)
       const answerIndex = answer.toUpperCase().charCodeAt(0) - 65;
-
+      
       // Check correctness
       return answerIndex === question.correctAnswer;
     } catch (error: any) {
-      this.logger.error(
-        `Error validating answer for question ${questionId}:`,
-        error.message || error,
-      );
+      this.logger.error(`Error validating answer for question ${questionId}:`, error.message || error);
       // Fallback validation
       return answer.toLowerCase().startsWith('a');
     }
   }
-}
+} 

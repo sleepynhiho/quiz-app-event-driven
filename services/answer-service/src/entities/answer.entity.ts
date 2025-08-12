@@ -1,9 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity('answers')
 export class Answer {
@@ -27,4 +22,4 @@ export class Answer {
 
   @Column({ name: 'is_correct', default: false })
   isCorrect: boolean;
-}
+} 
