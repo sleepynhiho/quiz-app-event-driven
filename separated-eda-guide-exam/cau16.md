@@ -262,453 +262,187 @@ graph TB
 #### 2.1 Container Orchestration Tools
 
 **A. Docker & Docker Compose**
-```yaml
-# Development environment
-Tools:
-  - Docker Engine: 24.0+
-  - Docker Compose: 2.0+
-  - Docker BuildKit: Enhanced build performance
-
-Usage:
-  - Local development
-  - Integration testing
-  - CI/CD pipeline builds
-```
+- **Docker Engine**: Container runtime
+- **Docker Compose**: Multi-container management
+- **Usage**: Local development, testing
 
 **B. Docker Swarm**
-```yaml
-# Production ready clustering
-Tools:
-  - Docker Swarm Mode: Built-in orchestration
-  - Docker Stack: Multi-service deployment
-  - Docker Secrets: Configuration management
-
-Benefits:
-  - Simple setup compared to Kubernetes
-  - Native Docker integration
-  - Built-in load balancing
-  - Rolling updates support
-```
+- **Docker Swarm Mode**: Simple clustering
+- **Benefits**: Easy setup, built-in load balancing
+- **Usage**: Small to medium production deployments
 
 **C. Kubernetes**
-```yaml
-# Enterprise grade orchestration  
-Tools:
-  - Kubernetes: 1.28+
-  - Helm: Package management
-  - kubectl: CLI management
-  - Kustomize: Configuration management
+- **Kubernetes**: Enterprise orchestration
+- **Helm**: Package management
+- **kubectl**: CLI management
+- **Usage**: Large scale production deployments
 
-Distributions:
-  - Google GKE: Managed Kubernetes
-  - Amazon EKS: AWS managed
-  - Azure AKS: Azure managed
-  - Minikube: Local development
-```
+#### 2.2 Infrastructure as Code
 
-#### 2.2 Infrastructure as Code Tools
-
-**A. Terraform**
+**Terraform Example**:
 ```hcl
-# Infrastructure provisioning
 resource "aws_ecs_cluster" "quiz_app" {
   name = "quiz-app-cluster"
-  
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
 }
 
 resource "aws_ecs_service" "quiz_service" {
   name            = "quiz-service"
   cluster         = aws_ecs_cluster.quiz_app.id
-  task_definition = aws_ecs_task_definition.quiz_service.arn
   desired_count   = 3
-  
-  load_balancer {
-    target_group_arn = aws_lb_target_group.quiz_tg.arn
-    container_name   = "quiz-service"
-    container_port   = 3000
-  }
 }
 ```
 
-**B. Ansible**
-```yaml
-# Configuration management
-- name: Deploy Quiz App Services
-  hosts: all
-  tasks:
-    - name: Start Docker containers
-      docker_container:
-        name: "{{ item.name }}"
-        image: "{{ item.image }}"
-        ports: "{{ item.ports }}"
-        env: "{{ item.environment }}"
-      loop:
-        - name: quiz-service
-          image: quiz-app/quiz-service:latest
-          ports: ["3000:3000"]
-          environment:
-            NODE_ENV: production
-            DATABASE_URL: "{{ db_url }}"
-```
+#### 2.3 CI/CD Pipeline
 
-#### 2.3 CI/CD Pipeline Tools
-
-**A. GitLab CI/CD**
+**Basic GitLab CI**:
 ```yaml
-# .gitlab-ci.yml
 stages:
   - build
-  - test
   - deploy
 
-build_services:
-  stage: build
+build:
   script:
-    - docker build -t quiz-app/quiz-service:$CI_COMMIT_SHA services/quiz-service/
-    - docker push quiz-app/quiz-service:$CI_COMMIT_SHA
+    - docker build -t quiz-service .
+    - docker push quiz-service
 
-deploy_staging:
-  stage: deploy
+deploy:
   script:
-    - helm upgrade --install quiz-app ./helm-chart
-      --set image.tag=$CI_COMMIT_SHA
-      --namespace staging
-  environment:
-    name: staging
-    url: https://staging.quiz-app.com
-```
-
-**B. GitHub Actions**
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy Quiz App
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build and push images
-        run: |
-          docker build -t ${{ secrets.REGISTRY }}/quiz-service:${{ github.sha }} .
-          docker push ${{ secrets.REGISTRY }}/quiz-service:${{ github.sha }}
-      
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl set image deployment/quiz-service 
-            quiz-service=${{ secrets.REGISTRY }}/quiz-service:${{ github.sha }}
+    - kubectl apply -f k8s/
 ```
 
 ### 3. Các bước Triển khai Hệ thống
 
 #### 3.1 Development Environment Setup
 
-**Step 1: Local Development với Docker Compose**
+**Quick Setup Commands**:
 ```bash
-# 1. Clone repository và setup environment
+# 1. Clone và setup
 git clone https://github.com/your-org/quiz-app-event-driven.git
 cd quiz-app-event-driven
 
-# 2. Setup environment variables
+# 2. Setup environment
 cp .env.example .env
-# Edit .env với local configuration
 
-# 3. Build và start infrastructure services
-docker-compose -f docker-compose.dev.yml up -d postgres redis kafka zookeeper
+# 3. Start infrastructure
+docker-compose up -d postgres redis kafka
 
-# 4. Wait for services to be ready
-./scripts/wait-for-services.sh
+# 4. Start services
+docker-compose up -d
 
-# 5. Run database migrations
-npm run db:migrate
-
-# 6. Build application images
-docker-compose -f docker-compose.dev.yml build
-
-# 7. Start all services
-docker-compose -f docker-compose.dev.yml up -d
-
-# 8. Verify deployment
+# 5. Verify
 curl http://localhost:3000/health
-curl http://localhost:3001/health  
-curl http://localhost:3002/health
-curl http://localhost:3003/health
 ```
 
-**Step 2: Development Docker Compose Configuration**
+**Basic Docker Compose**:
 ```yaml
-# docker-compose.dev.yml
+# docker-compose.yml
 version: '3.8'
-
 services:
-  # Infrastructure Services
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: quiz_dev
+      POSTGRES_DB: quiz_app
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
 
   kafka:
     image: confluentinc/cp-kafka:7.0.1
-    depends_on: [zookeeper]
     ports:
       - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  # Application Services
   user-service:
     build: ./services/user-service
     ports:
       - "3001:3001"
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_dev
-    depends_on: [postgres]
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_app
 
   quiz-service:
     build: ./services/quiz-service
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_dev
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_app
       KAFKA_BROKERS: kafka:9092
-    depends_on: [postgres, redis, kafka]
-
-  answer-service:
-    build: ./services/answer-service
-    ports:
-      - "3002:3002"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_dev
-      KAFKA_BROKERS: kafka:9092
-    depends_on: [postgres, kafka]
-
-  scoring-service:
-    build: ./services/scoring-service
-    ports:
-      - "3003:3003"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_dev
-      KAFKA_BROKERS: kafka:9092
-    depends_on: [postgres, kafka]
 
   frontend:
     build: ./frontend
     ports:
       - "80:80"
-    depends_on: [user-service, quiz-service, answer-service, scoring-service]
-
-volumes:
-  postgres_data:
-  redis_data:
 ```
 
 #### 3.2 Staging Environment Deployment
 
-**Step 1: Docker Swarm Staging Setup**
+**Docker Swarm Setup**:
 ```bash
-# 1. Initialize Docker Swarm
-docker swarm init --advertise-addr <MANAGER_IP>
+# 1. Initialize Swarm
+docker swarm init
 
-# 2. Join worker nodes
-docker swarm join --token <WORKER_TOKEN> <MANAGER_IP>:2377
+# 2. Deploy services
+docker stack deploy -c docker-stack.yml quiz-app
 
-# 3. Create overlay networks
-docker network create --driver overlay quiz-app-network
-docker network create --driver overlay kafka-network
-
-# 4. Deploy stack services
-docker stack deploy -c docker-stack.staging.yml quiz-app
-
-# 5. Verify deployment
+# 3. Verify
 docker service ls
-docker service ps quiz-app_quiz-service
 ```
 
-**Step 2: Staging Stack Configuration**
+**Basic Stack Configuration**:
 ```yaml
-# docker-stack.staging.yml
+# docker-stack.yml
 version: '3.8'
-
 services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    configs:
-      - source: nginx_config
-        target: /etc/nginx/nginx.conf
-    deploy:
-      replicas: 2
-      update_config:
-        parallelism: 1
-        delay: 10s
-    networks:
-      - quiz-app-network
-
   quiz-service:
-    image: quiz-app/quiz-service:staging
+    image: quiz-app/quiz-service:latest
     environment:
       NODE_ENV: staging
-      DATABASE_URL_FILE: /run/secrets/db_url
-      KAFKA_BROKERS: kafka:9092
-    secrets:
-      - db_url
-      - jwt_secret
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_app
     deploy:
       replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 30s
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
-    networks:
-      - quiz-app-network
-      - kafka-network
 
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: quiz_staging
-      POSTGRES_USER_FILE: /run/secrets/db_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_user
-      - db_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_DB: quiz_app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     deploy:
       replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-    networks:
-      - quiz-app-network
-
-  kafka:
-    image: confluentinc/cp-kafka:7.0.1
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
-    deploy:
-      replicas: 3
-      placement:
-        max_replicas_per_node: 1
-    networks:
-      - kafka-network
-
-networks:
-  quiz-app-network:
-    driver: overlay
-    attachable: true
-  kafka-network:
-    driver: overlay
-
-volumes:
-  postgres_data:
-
-secrets:
-  db_url:
-    external: true
-  db_user:
-    external: true
-  db_password:
-    external: true
-  jwt_secret:
-    external: true
-
-configs:
-  nginx_config:
-    external: true
 ```
 
 #### 3.3 Production Kubernetes Deployment
 
-**Step 1: Kubernetes Production Setup**
+**Basic Kubernetes Setup**:
 ```bash
-# 1. Setup Kubernetes cluster (example with kubeadm)
-kubeadm init --pod-network-cidr=10.244.0.0/16
-
-# 2. Install CNI plugin (Flannel)
-kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
-
-# 3. Join worker nodes
-kubeadm join <MASTER_IP>:6443 --token <TOKEN> --discovery-token-ca-cert-hash <HASH>
-
-# 4. Create namespace
+# 1. Create namespace
 kubectl create namespace quiz-app
 
-# 5. Setup RBAC và service accounts
-kubectl apply -f k8s/rbac/
+# 2. Deploy services
+kubectl apply -f k8s/
 
-# 6. Deploy infrastructure components
-kubectl apply -f k8s/infrastructure/
-
-# 7. Deploy application services
-kubectl apply -f k8s/applications/
-
-# 8. Setup ingress
-kubectl apply -f k8s/ingress/
+# 3. Verify
+kubectl get pods -n quiz-app
 ```
 
-**Step 2: Kubernetes Application Manifests**
+**Basic Kubernetes Manifest**:
 ```yaml
-# k8s/applications/quiz-service.yml
+# k8s/quiz-service.yml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: quiz-service
   namespace: quiz-app
-  labels:
-    app: quiz-service
 spec:
   replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
   selector:
     matchLabels:
       app: quiz-service
@@ -719,21 +453,12 @@ spec:
     spec:
       containers:
       - name: quiz-service
-        image: quiz-app/quiz-service:v1.0.0
+        image: quiz-app/quiz-service:latest
         ports:
         - containerPort: 3000
         env:
-        - name: NODE_ENV
-          value: "production"
         - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: quiz-secrets
-              key: database-url
-        - name: KAFKA_BROKERS
-          value: "kafka:9092"
-        - name: REDIS_URL
-          value: "redis://redis:6379"
+          value: "postgresql://postgres:password@postgres:5432/quiz_app"
         resources:
           requests:
             memory: "256Mi"
@@ -741,25 +466,6 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        volumeMounts:
-        - name: config-volume
-          mountPath: /app/config
-      volumes:
-      - name: config-volume
-        configMap:
-          name: quiz-config
 ---
 apiVersion: v1
 kind: Service
@@ -770,70 +476,31 @@ spec:
   selector:
     app: quiz-service
   ports:
-  - protocol: TCP
-    port: 3000
+  - port: 3000
     targetPort: 3000
-  type: ClusterIP
 ```
 
-**Step 3: Helm Chart Deployment**
+**Helm Deployment**:
 ```bash
-# 1. Create Helm chart structure
-helm create quiz-app
-
-# 2. Customize values for production
-cat > values.prod.yml << EOF
+# 1. Create basic values
+cat > values.yml << EOF
 replicaCount: 3
-
 image:
   repository: quiz-app/quiz-service
-  tag: v1.0.0
-  pullPolicy: IfNotPresent
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 250m
-    memory: 256Mi
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: quiz-app.production.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: quiz-app-tls
-      hosts:
-        - quiz-app.production.com
+  tag: latest
 EOF
 
-# 3. Deploy with Helm
-helm upgrade --install quiz-app ./quiz-app-chart \
-  --values values.prod.yml \
-  --namespace quiz-app \
-  --create-namespace
-
-# 4. Verify deployment
-helm status quiz-app -n quiz-app
-kubectl get pods -n quiz-app
+# 2. Deploy
+helm upgrade --install quiz-app ./chart \
+  --values values.yml \
+  --namespace quiz-app
 ```
 
 #### 3.4 Monitoring & Observability Setup
 
-**Step 1: Prometheus & Grafana Setup**
+**Basic Monitoring Setup**:
 ```yaml
-# monitoring/prometheus-config.yml
+# monitoring/prometheus.yml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -844,74 +511,27 @@ data:
       scrape_interval: 15s
     scrape_configs:
     - job_name: 'quiz-services'
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_label_app]
-        action: keep
-        regex: quiz-service|answer-service|scoring-service|user-service
-    - job_name: 'kafka'
       static_configs:
-      - targets: ['kafka:9092']
-    - job_name: 'postgres'
-      static_configs:
-      - targets: ['postgres:5432']
+      - targets: ['quiz-service:3000', 'user-service:3001']
 ```
 
-**Step 2: Logging với ELK Stack**
+**Simple Health Checks**:
 ```yaml
-# logging/filebeat-config.yml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: filebeat-config
-data:
-  filebeat.yml: |
-    filebeat.inputs:
-    - type: container
-      paths:
-        - /var/log/containers/*quiz*.log
-      processors:
-        - add_kubernetes_metadata:
-            in_cluster: true
-    
-    output.elasticsearch:
-      hosts: ["elasticsearch:9200"]
-      index: "quiz-app-logs-%{+yyyy.MM.dd}"
-    
-    setup.template.name: "quiz-app"
-    setup.template.pattern: "quiz-app-*"
-```
-
-**Step 3: Health Checks & Alerts**
-```yaml
-# monitoring/alertmanager-rules.yml
+# monitoring/alerts.yml
 groups:
 - name: quiz-app-alerts
   rules:
   - alert: ServiceDown
-    expr: up{job=~"quiz-.*"} == 0
+    expr: up == 0
     for: 1m
-    labels:
-      severity: critical
     annotations:
-      summary: "Quiz service {{ $labels.instance }} is down"
+      summary: "Service is down"
       
   - alert: HighErrorRate
     expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
     for: 2m
-    labels:
-      severity: warning
     annotations:
-      summary: "High error rate detected in {{ $labels.service }}"
-      
-  - alert: KafkaLag
-    expr: kafka_consumer_lag_sum > 1000
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "Kafka consumer lag is high: {{ $value }}"
+      summary: "High error rate detected"
 ```
 
-Kiến trúc triển khai Event-driven này giúp đảm bảo **high availability**, **scalability**, và **maintainability** cho Quiz App system, với khả năng tự động scale theo load và recover từ failures.
+Kiến trúc triển khai Event-driven này đảm bảo **high availability**, **scalability**, và **maintainability** cho Quiz App system.

@@ -67,128 +67,54 @@
 ## 2. Công cụ Kiểm tra Chất lượng
 
 ### A. Performance Testing (Kiểm tra Hiệu suất)
-
-#### A.1 Load Testing Tools
 **Công cụ chính**:
-- **Apache JMeter**: GUI-based, HTTP/WebSocket testing
-- **Artillery**: Node.js based, event-driven load testing  
-- **k6**: JavaScript-based, modern load testing
-- **Gatling**: Scala-based, high-performance testing
+- **Apache JMeter**: GUI-based load testing
+- **Artillery**: Node.js based testing  
+- **k6**: JavaScript-based load testing
 
-**Test scenarios cho Quiz App**:
-```bash
-# JMeter test plan
-1. Concurrent user registration: 100-1000 users/minute
-2. Quiz creation load: 50 quizzes/minute  
-3. Real-time quiz participation: 500 concurrent players
-4. Answer submission spike: 1000 answers trong 10 seconds
-5. WebSocket stress test: 2000 concurrent connections
-```
+**Test scenarios cơ bản**:
+- Concurrent user registration: 100-1000 users/minute
+- Quiz participation: 500 concurrent players
+- Answer submission: 1000 answers trong 10 seconds
+- WebSocket stress test: 2000 concurrent connections
 
-**Metrics cần đo**:
-- **Response time**: P50, P95, P99 percentiles
-- **Throughput**: Requests/second, Events/second
-- **Error rate**: <1% cho normal load, <5% cho peak load
-- **Resource utilization**: CPU, Memory, Network I/O
-- **Database performance**: Connection pool usage, query time
-
-#### A.2 Implementation Steps
-```bash
-# Artillery example cho Quiz App
-1. Setup test data: users, quizzes, questions
-2. Configure load patterns: ramp-up, steady-state, peak
-3. Test API endpoints: /auth, /quiz, /answer, /score
-4. WebSocket testing: join quiz, receive events
-5. Database load: concurrent reads/writes
-6. Kafka throughput: event publishing/consuming
-```
+**Metrics quan trọng**:
+- Response time: <200ms cho 95% requests
+- Throughput: Requests/second, Events/second
+- Error rate: <1% cho normal load
+- Resource utilization: CPU <80%, Memory <85%
 
 ### B. Reliability Testing (Kiểm tra Độ tin cậy)
-
-#### B.1 Chaos Engineering Tools
-**Công cụ**:
+**Công cụ Chaos Engineering**:
 - **Chaos Monkey**: Random service termination
-- **Chaos Toolkit**: Declarative chaos experiments  
-- **Litmus**: Kubernetes-native chaos engineering
 - **Pumba**: Docker container chaos testing
 
-**Failure scenarios**:
-```yaml
-# Chaos experiments cho Quiz App
-1. Service failures:
-   - Kill random microservice instances  
-   - Simulate OOM (Out of Memory)
-   - CPU exhaustion attacks
-
-2. Infrastructure failures:
-   - Kafka broker crashes
-   - PostgreSQL connection loss
-   - Redis cache failures
-   - Network partitions
-
-3. Dependency failures:
-   - External API timeouts
-   - Database query failures
-   - Message delivery failures
-```
-
-#### B.2 Resilience Testing Steps
-1. **Baseline measurement**: Establish normal performance metrics
-2. **Chaos injection**: Introduce controlled failures
-3. **Recovery monitoring**: Measure recovery time và impact
-4. **Failure analysis**: Identify weak points
-5. **Improvement iteration**: Fix issues và repeat
-
-**Expected behaviors**:
-- **Service recovery**: Auto-restart failed containers trong <30s
-- **Data consistency**: No data loss during failures
-- **Graceful degradation**: Core functionality vẫn available
-- **User experience**: Meaningful error messages, no crashes
-
-#### B.3 Data Integrity Testing
-**Tools**: Testcontainers, Docker Compose
-**Test cases**:
-```bash
-1. Database transaction rollback testing
-2. Kafka message delivery guarantees
-3. Event ordering verification  
-4. Duplicate event handling
-5. Network partition tolerance (CAP theorem)
-```
-
-
-### C. End-to-End Testing (Kiểm tra Tích hợp)
-
-#### C.1 E2E Testing Framework
-**Tools**: Cypress, Playwright, Selenium
 **Test scenarios**:
-```javascript
-// Cypress E2E test example
-1. User journey: Register → Login → Create Quiz → Start Quiz
-2. Multi-player scenario: Host starts quiz, 10 players join, answer questions
-3. Real-time updates: Verify leaderboard updates in real-time
-4. Error handling: Network disconnection, service failures
-5. Cross-browser compatibility: Chrome, Firefox, Safari
-```
+- Kill random microservice instances  
+- Simulate database connection loss
+- Kafka broker crashes
+- Network partitions
 
-#### C.2 Contract Testing  
-**Tools**: Pact, Spring Cloud Contract
-**Purpose**: Verify service integration contracts
-```yaml
-# Contract testing approach
-1. Define event schemas trong shared/types/
-2. Generate contract tests từ schemas
-3. Verify producer/consumer compatibility  
-4. Automate contract validation trong CI/CD
-```
+**Expected results**:
+- Auto-restart failed containers trong <30s
+- No data loss during failures
+- Core functionality vẫn available
+
+### C. End-to-End Testing
+**Tools**: Cypress, Playwright
+**Test scenarios**:
+- User journey: Register → Login → Create Quiz → Start Quiz
+- Multi-player scenario: 10 players join, answer questions
+- Real-time updates verification
+- Error handling testing
 
 ## 3. Sơ đồ Kiến trúc Lưu trữ
 
 ### 3.1 Tổng quan Storage Architecture 
-![alt text](./images_v2/14_storage_architecture.png)
+![alt text](../images_v2/14_storage_architecture.png)
 
 ### 3.2 Event Flow Architecture
-![alt text](./images_v2/14_event_flow.png)
+![alt text](../images_v2/14_event_flow.png)
 
 ### 3.5 Data Storage Layers
 
@@ -243,883 +169,207 @@ CREATE TABLE event_store (
 
 ### 4.1 Infrastructure Setup với Docker Compose
 
-#### A. Kafka Cluster Setup
-**Công cụ**: Docker Compose, Confluent Platform, Kafdrop UI
+#### A. Kafka Setup
+**Công cụ**: Docker Compose, Kafdrop UI
 
-**Configuration trong docker-compose.yml**:
+**Basic configuration**:
 ```yaml
-# Zookeeper cho Kafka coordination
 zookeeper:
   image: confluentinc/cp-zookeeper:7.0.1
   environment:
     ZOOKEEPER_CLIENT_PORT: 2181
-    ZOOKEEPER_TICK_TIME: 2000
-  volumes:
-    - zookeeper-data:/var/lib/zookeeper/data
 
-# Kafka broker với production-ready config  
 kafka:
   image: confluentinc/cp-kafka:7.0.1
-  depends_on: [zookeeper]
   environment:
     KAFKA_BROKER_ID: 1
     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
-    KAFKA_NUM_PARTITIONS: 3
-  volumes:
-    - kafka-data:/var/lib/kafka/data
 ```
 
-**Bước setup chi tiết**:
-```bash
-# 1. Start Kafka infrastructure
-docker-compose up -d zookeeper kafka
+**Topics thiết yếu**:
+- `quiz-events`: Quiz lifecycle events
+- `user-events`: User activities  
+- `answer-events`: Answer submissions
+- `scoring-events`: Score calculations
 
-# 2. Wait for Kafka to be ready
-docker-compose exec kafka kafka-topics --bootstrap-server localhost:9092 --list
-
-# 3. Create topics với specific configuration
-docker-compose exec kafka kafka-topics --create \
-  --bootstrap-server localhost:9092 \
-  --topic quiz-events \
-  --partitions 6 \
-  --replication-factor 1 \
-  --config retention.ms=604800000
-
-# 4. Create consumer groups
-docker-compose exec kafka kafka-consumer-groups \
-  --bootstrap-server localhost:9092 \
-  --list
-
-# 5. Monitor topic health
-docker-compose exec kafka kafka-log-dirs \
-  --bootstrap-server localhost:9092 \
-  --describe --json
-```
-
-**Topic design cho Quiz App**:
+#### B. PostgreSQL Setup
+**Configuration cơ bản**:
 ```yaml
-Topics:
-  quiz-events:
-    partitions: 6 (theo quizId hash)
-    retention: 7 days
-    cleanup.policy: delete
-    
-  user-events:
-    partitions: 3 (theo userId hash)
-    retention: 30 days
-    cleanup.policy: compact
-    
-  scoring-events:
-    partitions: 6 (theo quizId hash)  
-    retention: 14 days
-    cleanup.policy: delete
-```
-
-#### B. PostgreSQL Multi-Database Setup
-**Công cụ**: Docker, pgAdmin, Database migration tools
-
-**Configuration**:
-```yaml
-# Primary PostgreSQL instance
 postgres:
   image: postgres:15
   environment:
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: password
-    POSTGRES_MULTIPLE_DATABASES: user_db,quiz_db,answer_db,scoring_db
-  volumes:
-    - postgres-data:/var/lib/postgresql/data
-    - ./infra/postgres/init:/docker-entrypoint-initdb.d
-  ports:
-    - "5432:5432"
+    POSTGRES_DB: quiz_app
 ```
 
-**Database initialization scripts**:
+**Schema cơ bản**:
 ```sql
--- 01-init.sql: Create multiple databases
-CREATE DATABASE user_db;
-CREATE DATABASE quiz_db;  
-CREATE DATABASE answer_db;
-CREATE DATABASE scoring_db;
-
--- 02-quiz-schema.sql
-\c quiz_db;
+-- Quizzes table
 CREATE TABLE quizzes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
-  description TEXT,
   host_id UUID NOT NULL,
-  status VARCHAR(50) DEFAULT 'draft',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  status VARCHAR(50) DEFAULT 'draft'
 );
 
-CREATE TABLE questions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_id UUID REFERENCES quizzes(id) ON DELETE CASCADE,
-  question_text TEXT NOT NULL,
-  question_type VARCHAR(50) DEFAULT 'multiple_choice',
-  correct_answer JSONB NOT NULL,
-  options JSONB,
-  points INTEGER DEFAULT 10,
-  time_limit INTEGER DEFAULT 30,
-  order_index INTEGER NOT NULL
-);
-
--- 03-answers-schema.sql  
-\c answer_db;
+-- Answers table  
 CREATE TABLE answers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY,
   quiz_id UUID NOT NULL,
-  question_id UUID NOT NULL,
   player_id UUID NOT NULL,
   submitted_answer JSONB NOT NULL,
-  is_correct BOOLEAN NOT NULL,
-  response_time INTEGER NOT NULL,
-  submitted_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(quiz_id, question_id, player_id)
+  is_correct BOOLEAN NOT NULL
 );
-
--- 04-event-store.sql: Cross-service event store
-CREATE TABLE event_store (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  aggregate_id UUID NOT NULL,
-  aggregate_type VARCHAR(100) NOT NULL,
-  event_type VARCHAR(100) NOT NULL,
-  event_data JSONB NOT NULL,
-  event_version INTEGER NOT NULL,
-  sequence_number BIGSERIAL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(aggregate_id, event_version)
-);
-
-CREATE INDEX idx_event_store_aggregate ON event_store(aggregate_id, event_version);
-CREATE INDEX idx_event_store_type ON event_store(event_type);
-CREATE INDEX idx_event_store_created ON event_store(created_at);
 ```
 
-**Connection pooling setup**:
-```yaml
-# pgbouncer cho connection pooling
-pgbouncer:
-  image: pgbouncer/pgbouncer:latest
-  environment:
-    DATABASES_HOST: postgres
-    DATABASES_PORT: 5432
-    DATABASES_USER: postgres
-    DATABASES_PASSWORD: password
-    POOL_MODE: transaction
-    SERVER_RESET_QUERY: DISCARD ALL
-    MAX_CLIENT_CONN: 100
-    DEFAULT_POOL_SIZE: 20
-```
-
-#### C. Redis Cluster Setup 
-**Công cụ**: Redis Docker, Redis Sentinel, Redis Cluster
-
-**Single-node development setup**:
+#### C. Redis Setup
 ```yaml
 redis:
   image: redis:7-alpine
-  command: redis-server --appendonly yes --replica-read-only no
-  volumes:
-    - redis-data:/data
+  command: redis-server --appendonly yes
   ports:
     - "6379:6379"
 ```
 
-**Production cluster setup**:
-```yaml
-# Redis cluster với 3 masters + 3 replicas
-redis-cluster:
-  image: redis:7-alpine
-  command: redis-cli --cluster create \
-    redis-1:6379 redis-2:6379 redis-3:6379 \
-    redis-4:6379 redis-5:6379 redis-6:6379 \
-    --cluster-replicas 1 --cluster-yes
-```
-
-**Redis configuration cho Quiz App**:
-```conf
-# redis.conf
-maxmemory 256mb
-maxmemory-policy allkeys-lru
-save 900 1
-save 300 10  
-save 60 10000
-appendonly yes
-appendfsync everysec
-```
-
-### 4.2 Development Environment Setup
-
-#### A. Local Development với Docker Compose
+### 4.2 Development Setup
+**Quick start commands**:
 ```bash
-# 1. Clone repository
-git clone <quiz-app-repo>
-cd quiz-app-event-driven
+# Start infrastructure
+docker-compose up -d postgres redis kafka
 
-# 2. Start infrastructure services
-docker-compose up -d postgres redis kafka zookeeper
+# Start services
+npm run dev:all-services
 
-# 3. Wait for services to be ready
-./scripts/wait-for-services.sh
-
-# 4. Run database migrations
-npm run migrate:dev
-
-# 5. Start microservices trong development mode
-npm run dev:user-service &
-npm run dev:quiz-service &  
-npm run dev:answer-service &
-npm run dev:scoring-service &
-
-# 6. Start frontend
+# Start frontend
 cd frontend && npm start
 ```
 
-#### B. Production Deployment
-**Orchestration**: Docker Swarm hoặc Kubernetes
+## 5. Code Implementation Cơ bản
 
-**Docker Swarm setup**:
-```yaml
-# docker-stack.yml
-version: '3.8'
-services:
-  quiz-service:
-    image: quiz-app/quiz-service:latest
-    deploy:
-      replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 30s
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/quiz_db
-      KAFKA_BROKERS: kafka:9092
-      REDIS_URL: redis://redis:6379
-```
-
-**Kubernetes deployment**:
-```yaml
-# k8s-quiz-service.yml  
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: quiz-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: quiz-service
-  template:
-    metadata:
-      labels:
-        app: quiz-service
-    spec:
-      containers:
-      - name: quiz-service
-        image: quiz-app/quiz-service:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: db-secret
-              key: url
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi" 
-            cpu: "500m"
-```
-
-## 5. Code Implementation Chi tiết
-
-### 5.1 Event Sourcing & CQRS Implementation
-
-#### A. Event Store Repository
+### 5.1 Event Store & Repository Pattern
+**Event Store Repository**:
 ```typescript
-// shared/repositories/event-store.repository.ts
 @Injectable()
 export class EventStoreRepository {
-  constructor(
-    @InjectRepository(EventStoreEntity)
-    private eventStoreRepo: Repository<EventStoreEntity>
-  ) {}
-
-  async saveEvent(aggregateId: string, aggregateType: string, 
-                  eventType: string, eventData: any, version: number): Promise<void> {
-    const event = this.eventStoreRepo.create({
+  async saveEvent(aggregateId: string, eventType: string, eventData: any): Promise<void> {
+    const event = {
       aggregateId,
-      aggregateType,
       eventType,
       eventData,
-      eventVersion: version,
       createdAt: new Date()
-    });
+    };
     
-    try {
-      await this.eventStoreRepo.save(event);
-      // Publish to Kafka cho real-time processing
-      await this.kafkaService.publishEvent(event);
-    } catch (error) {
-      if (error.code === '23505') { // Unique constraint violation
-        throw new ConflictException(`Optimistic concurrency violation for ${aggregateId}`);
-      }
-      throw error;
-    }
+    // Save to database
+    await this.eventStoreRepo.save(event);
+    
+    // Publish to Kafka
+    await this.kafkaService.publishEvent(event);
   }
 
-  async getEvents(aggregateId: string, fromVersion?: number): Promise<EventStoreEntity[]> {
-    const query = this.eventStoreRepo
-      .createQueryBuilder('event')
-      .where('event.aggregateId = :aggregateId', { aggregateId })
-      .orderBy('event.eventVersion', 'ASC');
-    
-    if (fromVersion) {
-      query.andWhere('event.eventVersion > :fromVersion', { fromVersion });
-    }
-    
-    return await query.getMany();
-  }
-
-  async getEventsByType(eventType: string, fromDate: Date): Promise<EventStoreEntity[]> {
+  async getEvents(aggregateId: string): Promise<Event[]> {
     return await this.eventStoreRepo.find({
-      where: {
-        eventType,
-        createdAt: MoreThan(fromDate)
-      },
+      where: { aggregateId },
       order: { createdAt: 'ASC' }
     });
   }
 }
 ```
 
-#### B. Aggregate Root Base Class
+### 5.2 Kafka Producer/Consumer
+**Basic Kafka Producer**:
 ```typescript
-// shared/domain/aggregate-root.ts
-export abstract class AggregateRoot {
-  protected id: string;
-  protected version: number = 0;
-  private uncommittedEvents: DomainEvent[] = [];
-
-  constructor(id: string) {
-    this.id = id;
-  }
-
-  protected addEvent(event: DomainEvent): void {
-    this.uncommittedEvents.push(event);
-    this.version += 1;
-  }
-
-  public getUncommittedEvents(): DomainEvent[] {
-    return [...this.uncommittedEvents];
-  }
-
-  public clearEvents(): void {
-    this.uncommittedEvents = [];
-  }
-
-  public static fromEvents<T extends AggregateRoot>(
-    constructor: new (id: string) => T,
-    events: DomainEvent[]
-  ): T {
-    const aggregate = new constructor(events[0].aggregateId);
-    
-    for (const event of events) {
-      aggregate.applyEvent(event, false);
-    }
-    
-    aggregate.clearEvents();
-    return aggregate;
-  }
-
-  protected abstract applyEvent(event: DomainEvent, isNew: boolean): void;
-}
-```
-
-#### C. Quiz Aggregate Implementation
-```typescript
-// services/quiz-service/src/domain/quiz.aggregate.ts
-export class QuizAggregate extends AggregateRoot {
-  private title: string;
-  private questions: Question[] = [];
-  private participants: string[] = [];
-  private status: QuizStatus = QuizStatus.DRAFT;
-  private currentQuestionIndex: number = 0;
-
-  constructor(id: string) {
-    super(id);
-  }
-
-  public createQuiz(title: string, hostId: string, questions: Question[]): void {
-    if (this.version > 0) {
-      throw new Error('Quiz already exists');
-    }
-
-    const event = new QuizCreatedEvent(this.id, title, hostId, questions);
-    this.addEvent(event);
-    this.applyEvent(event, true);
-  }
-
-  public startQuiz(): void {
-    if (this.status !== QuizStatus.READY) {
-      throw new Error('Quiz must be in READY status to start');
-    }
-
-    const event = new QuizStartedEvent(this.id, this.participants);
-    this.addEvent(event);
-    this.applyEvent(event, true);
-  }
-
-  public addParticipant(playerId: string): void {
-    if (this.participants.includes(playerId)) {
-      throw new Error('Player already joined');
-    }
-
-    const event = new PlayerJoinedEvent(this.id, playerId);
-    this.addEvent(event);
-    this.applyEvent(event, true);
-  }
-
-  protected applyEvent(event: DomainEvent, isNew: boolean): void {
-    switch (event.eventType) {
-      case 'quiz.created':
-        this.applyQuizCreated(event as QuizCreatedEvent);
-        break;
-      case 'quiz.started':
-        this.applyQuizStarted(event as QuizStartedEvent);
-        break;
-      case 'player.joined':
-        this.applyPlayerJoined(event as PlayerJoinedEvent);
-        break;
-      default:
-        throw new Error(`Unknown event type: ${event.eventType}`);
-    }
-
-    if (!isNew) {
-      this.version += 1;
-    }
-  }
-
-  private applyQuizCreated(event: QuizCreatedEvent): void {
-    this.title = event.title;
-    this.questions = event.questions;
-    this.status = QuizStatus.DRAFT;
-  }
-
-  private applyQuizStarted(event: QuizStartedEvent): void {
-    this.status = QuizStatus.ACTIVE;
-    this.currentQuestionIndex = 0;
-  }
-
-  private applyPlayerJoined(event: PlayerJoinedEvent): void {
-    this.participants.push(event.playerId);
-  }
-}
-```
-
-### 5.2 Event Publishing & Consuming
-
-#### A. Advanced Kafka Producer với Retry Logic
-```typescript
-// shared/services/kafka-producer.service.ts
 @Injectable()
 export class KafkaProducerService {
-  private producer: Producer;
-  private readonly retryConfig: RetryConfig = {
-    maxRetries: 3,
-    initialRetryDelay: 1000,
-    maxRetryDelay: 5000,
-    retryMultiplier: 2
-  };
-
-  async onModuleInit() {
-    this.producer = this.kafka.producer({
-      groupId: 'quiz-app-producers',
-      transactionTimeout: 30000,
-      retry: {
-        initialRetryTime: 100,
-        retries: 8
-      }
-    });
-    await this.producer.connect();
-  }
-
   async publishEvent(event: DomainEvent): Promise<void> {
     const message = {
       key: event.aggregateId,
-      value: JSON.stringify({
-        eventId: event.eventId,
-        eventType: event.eventType,
-        aggregateId: event.aggregateId,
-        aggregateType: event.aggregateType,
-        payload: event.payload,
-        version: event.version,
-        timestamp: event.timestamp
-      }),
-      headers: {
-        'event-type': event.eventType,
-        'aggregate-type': event.aggregateType,
-        'content-type': 'application/json'
-      }
+      value: JSON.stringify(event)
     };
 
-    const topic = this.getTopicForEvent(event.eventType);
-    
-    await this.retryWrapper(async () => {
-      await this.producer.send({
-        topic,
-        messages: [message]
-      });
+    await this.producer.send({
+      topic: 'quiz-events',
+      messages: [message]
     });
-
-    this.logger.log(`Event published: ${event.eventType} for ${event.aggregateId}`);
-  }
-
-  async publishBatch(events: DomainEvent[]): Promise<void> {
-    const groupedByTopic = events.reduce((acc, event) => {
-      const topic = this.getTopicForEvent(event.eventType);
-      if (!acc[topic]) acc[topic] = [];
-      
-      acc[topic].push({
-        key: event.aggregateId,
-        value: JSON.stringify(event),
-        headers: {
-          'event-type': event.eventType,
-          'aggregate-type': event.aggregateType
-        }
-      });
-      
-      return acc;
-    }, {} as Record<string, any[]>);
-
-    const topicMessages = Object.entries(groupedByTopic).map(([topic, messages]) => ({
-      topic,
-      messages
-    }));
-
-    await this.retryWrapper(async () => {
-      await this.producer.sendBatch({ topicMessages });
-    });
-  }
-
-  private async retryWrapper<T>(operation: () => Promise<T>): Promise<T> {
-    let lastError: Error;
-    
-    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error;
-        
-        if (attempt === this.retryConfig.maxRetries) {
-          break;
-        }
-
-        const delay = Math.min(
-          this.retryConfig.initialRetryDelay * Math.pow(this.retryConfig.retryMultiplier, attempt),
-          this.retryConfig.maxRetryDelay
-        );
-        
-        this.logger.warn(`Retry attempt ${attempt + 1} after ${delay}ms: ${error.message}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    
-    throw new Error(`Failed after ${this.retryConfig.maxRetries} retries: ${lastError.message}`);
-  }
-
-  private getTopicForEvent(eventType: string): string {
-    const topicMap: Record<string, string> = {
-      'quiz.created': 'quiz-events',
-      'quiz.started': 'quiz-events',
-      'quiz.ended': 'quiz-events',
-      'player.joined': 'user-events',
-      'answer.submitted': 'answer-events',
-      'score.updated': 'scoring-events'
-    };
-    
-    return topicMap[eventType] || 'default-events';
   }
 }
 ```
 
-#### B. Event Consumer với Error Handling
+**Basic Event Consumer**:
 ```typescript
-// services/scoring-service/src/services/event-consumer.service.ts
 @Injectable()
-export class ScoringEventConsumerService {
-  constructor(
-    private scoringService: ScoringService,
-    private deadLetterService: DeadLetterService,
-    private metricsService: MetricsService
-  ) {}
-
+export class EventConsumerService {
   @EventPattern('answer.submitted')
-  async handleAnswerSubmitted(context: KafkaContext): Promise<void> {
-    const message = context.getMessage();
-    const event = JSON.parse(message.value.toString()) as AnswerSubmittedEvent;
+  async handleAnswerSubmitted(event: AnswerSubmittedEvent): Promise<void> {
+    // Calculate score
+    const score = await this.scoringService.calculateScore(event.payload);
     
-    const startTime = Date.now();
-    
-    try {
-      await this.processAnswerSubmitted(event);
-      
-      // Metrics collection
-      this.metricsService.recordEventProcessingTime(
-        'answer.submitted',
-        Date.now() - startTime
-      );
-      this.metricsService.incrementEventProcessedCounter('answer.submitted', 'success');
-      
-    } catch (error) {
-      this.logger.error(`Failed to process answer.submitted event: ${error.message}`, {
-        eventId: event.eventId,
-        aggregateId: event.aggregateId,
-        error: error.stack
-      });
-
-      await this.handleProcessingError(event, error, context);
-    }
-  }
-
-  private async processAnswerSubmitted(event: AnswerSubmittedEvent): Promise<void> {
-    // Idempotency check
-    const existingProcessing = await this.checkProcessedEvent(event.eventId);
-    if (existingProcessing) {
-      this.logger.info(`Event ${event.eventId} already processed, skipping`);
-      return;
-    }
-
-    // Business logic
-    const score = await this.scoringService.calculateScore({
-      quizId: event.aggregateId,
-      playerId: event.payload.playerId,
-      questionId: event.payload.questionId,
-      isCorrect: event.payload.isCorrect,
-      responseTime: event.payload.responseTime,
-      submittedAt: new Date(event.timestamp)
-    });
-
-    await this.scoringService.updatePlayerScore(score);
-
-    // Mark as processed
-    await this.markEventProcessed(event.eventId);
-
-    // Publish derived events
-    if (score.isNewLeader) {
-      await this.kafkaProducer.publishEvent(
-        new LeaderboardUpdatedEvent(event.aggregateId, score.playerId, score.totalScore)
-      );
-    }
-  }
-
-  private async handleProcessingError(
-    event: DomainEvent, 
-    error: Error, 
-    context: KafkaContext
-  ): Promise<void> {
-    const retryCount = this.getRetryCount(context);
-    const maxRetries = 3;
-
-    if (retryCount < maxRetries) {
-      // Schedule retry với exponential backoff
-      const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
-      
-      setTimeout(async () => {
-        try {
-          await this.processAnswerSubmitted(event as AnswerSubmittedEvent);
-        } catch (retryError) {
-          await this.handleProcessingError(event, retryError, context);
-        }
-      }, delay);
-      
-    } else {
-      // Send to dead letter queue
-      await this.deadLetterService.sendToDeadLetter({
-        originalEvent: event,
-        error: error.message,
-        retryCount,
-        failedAt: new Date()
-      });
-      
-      this.metricsService.incrementEventProcessedCounter('answer.submitted', 'failed');
-    }
-  }
-
-  private getRetryCount(context: KafkaContext): number {
-    const headers = context.getMessage().headers;
-    return parseInt(headers?.['retry-count']?.toString() || '0');
-  }
-}
-```
-
-### 5.3 CQRS Read Models & Projections
-
-#### A. Read Model cho Leaderboard
-```typescript
-// services/scoring-service/src/projections/leaderboard.projection.ts
-@Injectable()
-export class LeaderboardProjection {
-  constructor(
-    @InjectRepository(LeaderboardReadModel)
-    private leaderboardRepo: Repository<LeaderboardReadModel>,
-    private redisService: RedisService
-  ) {}
-
-  @EventPattern('score.updated')
-  async onScoreUpdated(event: ScoreUpdatedEvent): Promise<void> {
-    const { quizId, playerId, totalScore, rank } = event.payload;
-    
-    // Update persistent read model
-    await this.leaderboardRepo.upsert({
-      quizId,
-      playerId,
-      totalScore,
-      rank,
-      lastUpdated: new Date(event.timestamp)
-    }, ['quizId', 'playerId']);
-
-    // Update Redis cache cho real-time access
-    await this.updateRedisLeaderboard(quizId, playerId, totalScore);
+    // Update leaderboard
+    await this.leaderboardService.updateScore(score);
     
     // Notify via WebSocket
-    await this.notifyLeaderboardUpdate(quizId, {
-      playerId,
-      totalScore,
-      rank
-    });
-  }
-
-  private async updateRedisLeaderboard(quizId: string, playerId: string, score: number): Promise<void> {
-    const key = `leaderboard:${quizId}`;
-    
-    // Use Redis Sorted Set cho efficient ranking
-    await this.redisService.zadd(key, score, playerId);
-    await this.redisService.expire(key, 3600); // 1 hour TTL
-  }
-
-  async getLeaderboard(quizId: string, limit: number = 10): Promise<LeaderboardEntry[]> {
-    const cacheKey = `leaderboard:${quizId}`;
-    
-    // Try Redis first
-    const cachedData = await this.redisService.zrevrange(
-      cacheKey, 0, limit - 1, 'WITHSCORES'
-    );
-    
-    if (cachedData.length > 0) {
-      return this.formatLeaderboardData(cachedData);
-    }
-
-    // Fallback to database
-    const dbData = await this.leaderboardRepo.find({
-      where: { quizId },
-      order: { totalScore: 'DESC', lastUpdated: 'ASC' },
-      take: limit
-    });
-
-    // Populate cache
-    if (dbData.length > 0) {
-      const pipeline = this.redisService.pipeline();
-      dbData.forEach(entry => {
-        pipeline.zadd(cacheKey, entry.totalScore, entry.playerId);
-      });
-      pipeline.expire(cacheKey, 3600);
-      await pipeline.exec();
-    }
-
-    return dbData.map(entry => ({
-      playerId: entry.playerId,
-      totalScore: entry.totalScore,
-      rank: entry.rank
-    }));
+    await this.notificationService.notifyScoreUpdate(score);
   }
 }
 ```
 
-#### B. Event Handler với Saga Pattern
+### 5.3 CQRS Read Models
+**Leaderboard Read Model**:
 ```typescript
-// services/quiz-service/src/sagas/quiz-completion.saga.ts
 @Injectable()
-export class QuizCompletionSaga {
-  private sagaStates = new Map<string, QuizCompletionState>();
+export class LeaderboardProjection {
+  @EventPattern('score.updated')
+  async onScoreUpdated(event: ScoreUpdatedEvent): Promise<void> {
+    // Update database
+    await this.leaderboardRepo.upsert({
+      quizId: event.quizId,
+      playerId: event.playerId,
+      totalScore: event.totalScore
+    });
 
-  @EventPattern('quiz.ended')
-  async onQuizEnded(event: QuizEndedEvent): Promise<void> {
-    const sagaId = `quiz-completion-${event.aggregateId}`;
-    const state = new QuizCompletionState(sagaId, event.aggregateId);
-    
-    this.sagaStates.set(sagaId, state);
-    
-    // Step 1: Finalize all scores
-    await this.finalizeScores(event.aggregateId);
-    state.markScoresFinalized();
-    
-    // Step 2: Generate quiz report
-    await this.generateQuizReport(event.aggregateId);
-    state.markReportGenerated();
-    
-    // Step 3: Notify participants
-    await this.notifyParticipants(event.aggregateId, event.payload.participants);
-    state.markParticipantsNotified();
-    
-    // Complete saga
-    state.markCompleted();
-    this.sagaStates.delete(sagaId);
+    // Update Redis cache
+    await this.redisService.zadd(`leaderboard:${event.quizId}`, event.totalScore, event.playerId);
   }
 
-  @EventPattern('score.finalization.failed')
-  async onScoreFinalizationFailed(event: ScoreFinalizationFailedEvent): Promise<void> {
-    const sagaId = `quiz-completion-${event.aggregateId}`;
-    const state = this.sagaStates.get(sagaId);
-    
-    if (state) {
-      // Compensating action: revert quiz to ended-with-errors state
-      await this.revertQuizCompletion(event.aggregateId);
-      state.markFailed('Score finalization failed');
-    }
-  }
+  async getLeaderboard(quizId: string): Promise<LeaderboardEntry[]> {
+    // Try cache first
+    const cached = await this.redisService.zrevrange(`leaderboard:${quizId}`, 0, 9);
+    if (cached.length > 0) return cached;
 
-  private async finalizeScores(quizId: string): Promise<void> {
+    // Fallback to database
+    return await this.leaderboardRepo.find({
+      where: { quizId },
+      order: { totalScore: 'DESC' },
+      take: 10
+    });
+  }
+}
+```
+
+### 5.4 Error Handling & Retry Logic
+**Basic Retry Pattern**:
+```typescript
+async processEvent(event: DomainEvent): Promise<void> {
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
     try {
-      await this.kafkaProducer.publishEvent(
-        new FinalizeScoresCommand(quizId)
-      );
+      await this.businessLogic(event);
+      return; // Success
     } catch (error) {
-      await this.kafkaProducer.publishEvent(
-        new ScoreFinalizationFailedEvent(quizId, error.message)
-      );
-      throw error;
+      attempt++;
+      if (attempt >= maxRetries) {
+        // Send to dead letter queue
+        await this.deadLetterService.sendToDeadLetter(event, error);
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
-  }
-
-  private async generateQuizReport(quizId: string): Promise<void> {
-    // Generate comprehensive quiz analytics
-    const analytics = await this.analyticsService.generateQuizReport(quizId);
-    
-    await this.kafkaProducer.publishEvent(
-      new QuizReportGeneratedEvent(quizId, analytics)
-    );
-  }
-
-  private async notifyParticipants(quizId: string, participants: string[]): Promise<void> {
-    const notifications = participants.map(playerId => 
-      new ParticipantNotificationEvent(quizId, playerId, 'quiz_completed')
-    );
-    
-    await this.kafkaProducer.publishBatch(notifications);
   }
 }
 ```

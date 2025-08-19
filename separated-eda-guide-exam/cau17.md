@@ -14,28 +14,19 @@
 ### 1.2 Three Pillars of Observability
 
 #### A. Metrics (Đo lường)
-**Mục đích**: Quantitative measurements của system performance
-**Đặc điểm**: 
-- Time-series data với timestamps
-- Aggregated values (count, average, percentiles)
-- Low storage overhead
-- Good for alerting và monitoring trends
+- **Mục đích**: Đo lường hiệu suất hệ thống
+- **Đặc điểm**: Time-series data, aggregated values
+- **Sử dụng**: Alerting và monitoring trends
 
 #### B. Logs (Nhật ký)
-**Mục đích**: Detailed records của individual events
-**Đặc điểm**:
-- Structured hoặc unstructured text
-- Context-rich information
-- High storage volume
-- Good for debugging và forensics
+- **Mục đích**: Ghi lại chi tiết các events
+- **Đặc điểm**: Structured/unstructured text, context-rich
+- **Sử dụng**: Debugging và forensics
 
 #### C. Traces (Dấu vết)
-**Mục đích**: End-to-end request flow tracking
-**Đặc điểm**:
-- Distributed transaction visibility
-- Span relationships và dependencies
-- Performance bottleneck identification
-- Root cause analysis
+- **Mục đích**: Theo dõi request flow end-to-end
+- **Đặc điểm**: Distributed transaction visibility
+- **Sử dụng**: Performance analysis và root cause analysis
 
 ## 2. Sơ đồ Observability Architecture
 
@@ -170,232 +161,81 @@ sequenceDiagram
 ### 3.1 Metrics Collection & Storage
 
 #### A. Prometheus Stack
-**Mục đích**: Time-series metrics collection và alerting
-**Components**:
-```yaml
-# Prometheus configuration
-Prometheus Server:
-  - Metrics scraping từ service endpoints
-  - Rule evaluation cho alerting
-  - Local storage (15 days retention)
-  - PromQL query language
+**Components chính**:
+- **Prometheus Server**: Metrics scraping và alerting
+- **Node Exporter**: Host-level metrics (CPU, memory, disk)
+- **Application Metrics**: Custom metrics từ Quiz App services
 
-Node Exporter:
-  - Host-level metrics (CPU, memory, disk, network)
-  - System metrics cho infrastructure monitoring
-
-Application Metrics:
-  - Custom metrics từ Quiz App services
-  - Business metrics (quiz created, answers submitted)
-  - Performance metrics (request duration, error rates)
-```
-
-**Quiz App Metrics Examples**:
+**Basic Quiz Metrics Example**:
 ```typescript
-// services/quiz-service/src/metrics/quiz.metrics.ts
-import { register, Counter, Histogram, Gauge } from 'prom-client';
+// Basic metrics cho Quiz App
+import { Counter, Histogram, Gauge } from 'prom-client';
 
 export const quizMetrics = {
   quizzesCreated: new Counter({
     name: 'quiz_created_total',
-    help: 'Total number of quizzes created',
-    labelNames: ['status', 'host_id']
-  }),
-  
-  quizDuration: new Histogram({
-    name: 'quiz_duration_seconds',
-    help: 'Quiz completion time in seconds',
-    labelNames: ['quiz_id'],
-    buckets: [30, 60, 120, 300, 600, 1200] // 30s to 20min
-  }),
-  
-  activeQuizzes: new Gauge({
-    name: 'active_quizzes_current',
-    help: 'Number of currently active quizzes',
-    labelNames: ['status']
+    help: 'Total number of quizzes created'
   }),
   
   eventProcessingTime: new Histogram({
     name: 'event_processing_duration_ms',
     help: 'Time taken to process events',
-    labelNames: ['event_type', 'service'],
     buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000]
+  }),
+  
+  activeQuizzes: new Gauge({
+    name: 'active_quizzes_current',
+    help: 'Number of currently active quizzes'
   })
 };
 ```
 
 #### B. Infrastructure Metrics
-**Kafka Metrics với JMX Exporter**:
-```yaml
-# kafka-jmx-config.yml
-rules:
-- pattern: kafka.server<type=BrokerTopicMetrics, name=MessagesInPerSec, topic=(.+)><>OneMinuteRate
-  name: kafka_topic_messages_in_per_sec
-  labels:
-    topic: $1
-
-- pattern: kafka.server<type=BrokerTopicMetrics, name=BytesInPerSec, topic=(.+)><>OneMinuteRate
-  name: kafka_topic_bytes_in_per_sec
-  labels:
-    topic: $1
-
-- pattern: kafka.consumer<type=consumer-fetch-manager-metrics, client-id=(.+), topic=(.+), partition=(.+)><>lag
-  name: kafka_consumer_lag
-  labels:
-    client_id: $1
-    topic: $2
-    partition: $3
-```
-
-**PostgreSQL Metrics với postgres_exporter**:
-```sql
-# Custom queries cho Quiz App
-- name: quiz_database_stats
-  query: |
-    SELECT 
-      schemaname,
-      tablename,
-      n_tup_ins as inserts,
-      n_tup_upd as updates,
-      n_tup_del as deletes,
-      n_live_tup as live_tuples,
-      n_dead_tup as dead_tuples
-    FROM pg_stat_user_tables
-    WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
-  metrics:
-    - schemaname:
-        usage: "LABEL"
-    - tablename:
-        usage: "LABEL"
-    - inserts:
-        usage: "COUNTER"
-    - updates:
-        usage: "COUNTER"
-    - deletes:
-        usage: "COUNTER"
-    - live_tuples:
-        usage: "GAUGE"
-    - dead_tuples:
-        usage: "GAUGE"
-```
+**Key metrics to track**:
+- **Kafka**: Message rates, consumer lag, broker health
+- **PostgreSQL**: Connection pools, query performance
+- **Redis**: Memory usage, hit rates
+- **Node**: CPU, memory, disk usage
 
 ### 3.2 Logging Stack
 
 #### A. ELK/EFK Stack
-**Elasticsearch**: Distributed search engine cho log storage
-**Logstash/Fluentd**: Log processing và enrichment
-**Kibana**: Log visualization và search interface
+**Components**:
+- **Elasticsearch**: Log storage và search
+- **Logstash/Fluentd**: Log processing và enrichment  
+- **Kibana**: Log visualization và search interface
 
-**Structured Logging cho Quiz App**:
+**Basic Structured Logging**:
 ```typescript
-// shared/utils/logger.ts
+// Basic logger setup
 import winston from 'winston';
-import { format } from 'winston';
-
-const logFormat = format.combine(
-  format.timestamp(),
-  format.errors({ stack: true }),
-  format.json(),
-  format.printf(({ timestamp, level, message, service, traceId, spanId, ...meta }) => {
-    return JSON.stringify({
-      '@timestamp': timestamp,
-      level,
-      message,
-      service,
-      traceId,
-      spanId,
-      event: meta.event || null,
-      userId: meta.userId || null,
-      quizId: meta.quizId || null,
-      duration: meta.duration || null,
-      error: meta.error || null,
-      ...meta
-    });
-  })
-);
 
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: logFormat,
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ 
-      filename: '/var/log/quiz-app/app.log',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5
-    })
+    new winston.transports.File({ filename: 'app.log' })
   ]
 });
 
-// Event-specific logging
-export const logEvent = (eventType: string, eventData: any, context: any = {}) => {
+// Event logging helper
+export const logEvent = (eventType: string, eventData: any) => {
   logger.info('Event processed', {
     event: {
       type: eventType,
       id: eventData.eventId,
-      aggregateId: eventData.aggregateId,
-      version: eventData.version,
-      timestamp: eventData.timestamp
-    },
-    ...context
+      aggregateId: eventData.aggregateId
+    }
   });
 };
 ```
 
-**Fluentd Configuration cho Event Logs**:
-```yaml
-# fluentd/fluent.conf
-<source>
-  @type tail
-  path /var/log/quiz-app/*.log
-  pos_file /var/log/fluentd/quiz-app.log.pos
-  tag quiz-app.*
-  format json
-  time_key @timestamp
-  time_format %Y-%m-%dT%H:%M:%S.%LZ
-</source>
-
-<filter quiz-app.**>
-  @type parser
-  key_name message
-  reserve_data true
-  <parse>
-    @type json
-  </parse>
-</filter>
-
-<filter quiz-app.**>
-  @type record_transformer
-  <record>
-    hostname ${hostname}
-    environment ${ENV}
-    cluster_name quiz-app-cluster
-  </record>
-</filter>
-
-# Enrich event logs với metadata
-<filter quiz-app.** >
-  @type grep
-  <regexp>
-    key event.type
-    pattern ^(quiz\.|answer\.|score\.|user\.)
-  </regexp>
-</filter>
-
-<match quiz-app.**>
-  @type elasticsearch
-  host elasticsearch
-  port 9200
-  index_name quiz-app-logs-%Y.%m.%d
-  type_name _doc
-  flush_interval 5s
-  buffer_chunk_limit 2M
-  buffer_queue_limit 32
-</match>
-```
-
-#### B. Log Parsing & Enrichment
-**Event Log Structure**:
+#### B. Log Structure
+**Basic Event Log Format**:
 ```json
 {
   "@timestamp": "2024-01-15T10:30:45.123Z",
@@ -403,116 +243,65 @@ export const logEvent = (eventType: string, eventData: any, context: any = {}) =
   "message": "Event processed successfully",
   "service": "quiz-service",
   "traceId": "trace-abc-123",
-  "spanId": "span-def-456",
   "event": {
     "type": "quiz.started",
     "id": "event-789",
-    "aggregateId": "quiz-xyz-999",
-    "version": 1,
-    "timestamp": "2024-01-15T10:30:45.000Z"
+    "aggregateId": "quiz-xyz-999"
   },
   "userId": "user-123",
-  "quizId": "quiz-xyz-999",
-  "duration": 45,
-  "hostname": "quiz-service-pod-1",
-  "environment": "production",
-  "cluster_name": "quiz-app-cluster"
+  "quizId": "quiz-xyz-999"
 }
 ```
 
 ### 3.3 Distributed Tracing
 
-#### A. OpenTelemetry Implementation
-**Instrumentation Setup**:
+#### A. OpenTelemetry Setup
+**Basic Tracing Configuration**:
 ```typescript
-// shared/tracing/opentelemetry.ts
+// Basic OpenTelemetry setup
 import { NodeSDK } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 
 const jaegerExporter = new JaegerExporter({
-  endpoint: process.env.JAEGER_ENDPOINT || 'http://jaeger:14268/api/traces',
+  endpoint: 'http://jaeger:14268/api/traces'
 });
 
 const sdk = new NodeSDK({
-  resource: new Resource({
-    [SemanticResourceAttributes.SERVICE_NAME]: process.env.SERVICE_NAME || 'quiz-app',
-    [SemanticResourceAttributes.SERVICE_VERSION]: process.env.SERVICE_VERSION || '1.0.0',
-    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development'
-  }),
-  spanProcessor: new BatchSpanProcessor(jaegerExporter),
-  instrumentations: [] // Auto-instrumentation enabled
+  serviceName: 'quiz-service',
+  spanProcessor: new BatchSpanProcessor(jaegerExporter)
 });
 
 sdk.start();
-
-// Custom tracing utilities
-export const createEventSpan = (tracer: any, eventType: string, parentContext?: any) => {
-  return tracer.startSpan(`event.${eventType}`, {
-    parent: parentContext,
-    attributes: {
-      'event.type': eventType,
-      'component': 'event-processor'
-    }
-  });
-};
 ```
 
-**Event Processing Tracing**:
+**Basic Event Tracing**:
 ```typescript
-// services/quiz-service/src/services/quiz.service.ts
-import { trace, context } from '@opentelemetry/api';
-import { logger } from '../../../shared/utils/logger';
+// Basic tracing trong services
+import { trace } from '@opentelemetry/api';
 
 export class QuizService {
   private tracer = trace.getTracer('quiz-service');
 
-  async createQuiz(createQuizDto: CreateQuizDto, hostId: string): Promise<Quiz> {
+  async createQuiz(createQuizDto: CreateQuizDto): Promise<Quiz> {
     const span = this.tracer.startSpan('quiz.create');
     
     try {
       span.setAttributes({
         'quiz.title': createQuizDto.title,
-        'quiz.host_id': hostId,
         'quiz.questions_count': createQuizDto.questions.length
       });
 
-      // Business logic
-      const quiz = await this.quizRepository.create({...createQuizDto, hostId});
+      const quiz = await this.quizRepository.create(createQuizDto);
+      const event = new QuizCreatedEvent(quiz.id, quiz.title);
       
-      // Create và publish event
-      const event = new QuizCreatedEvent(quiz.id, quiz.title, hostId, quiz.questions);
+      await this.kafkaProducer.publishEvent(event);
       
-      // Propagate trace context to event
-      const eventSpan = this.tracer.startSpan('event.quiz.created', { parent: span });
-      eventSpan.setAttributes({
-        'event.id': event.eventId,
-        'event.type': 'quiz.created',
-        'event.aggregate_id': quiz.id
-      });
-
-      await context.with(trace.setSpan(context.active(), eventSpan), async () => {
-        await this.kafkaProducer.publishEvent(event);
-        
-        logger.info('Quiz created successfully', {
-          quizId: quiz.id,
-          eventId: event.eventId,
-          traceId: span.spanContext().traceId,
-          spanId: span.spanContext().spanId,
-          duration: Date.now() - span.startTime
-        });
-      });
-
-      eventSpan.end();
       span.setStatus({ code: 1 }); // OK
-      
       return quiz;
       
     } catch (error) {
       span.recordException(error);
-      span.setStatus({ code: 2, message: error.message }); // ERROR
+      span.setStatus({ code: 2, message: error.message });
       throw error;
     } finally {
       span.end();
@@ -522,17 +311,14 @@ export class QuizService {
 ```
 
 #### B. Cross-Service Trace Propagation
-**Kafka Message Headers cho Trace Context**:
+**Basic Kafka Trace Propagation**:
 ```typescript
-// shared/services/kafka-producer.service.ts
-import { trace, propagation, context } from '@opentelemetry/api';
-
+// Trace context qua Kafka messages
 export class KafkaProducerService {
   async publishEvent(event: DomainEvent): Promise<void> {
-    const span = trace.getActiveSpan();
     const headers: Record<string, string> = {};
     
-    // Inject trace context vào Kafka headers
+    // Inject trace context vào headers
     propagation.inject(context.active(), headers);
     
     const message = {
@@ -540,42 +326,28 @@ export class KafkaProducerService {
       value: JSON.stringify(event),
       headers: {
         ...headers,
-        'event-type': event.eventType,
-        'event-id': event.eventId,
-        'aggregate-type': event.aggregateType,
-        'content-type': 'application/json'
+        'event-type': event.eventType
       }
     };
 
     await this.producer.send({
-      topic: this.getTopicForEvent(event.eventType),
+      topic: 'quiz-events',
       messages: [message]
     });
   }
 }
 
-// Consumer side - extract trace context
+// Consumer extracts trace context
 export class KafkaConsumerService {
   @EventPattern('quiz.created')
   async handleQuizCreated(context: KafkaContext): Promise<void> {
-    const message = context.getMessage();
-    const headers = message.headers || {};
+    const headers = context.getMessage().headers || {};
     
-    // Extract trace context từ headers
+    // Extract trace context
     const parentContext = propagation.extract(context.active(), headers);
     
     await context.with(parentContext, async () => {
-      const span = trace.getActiveSpan();
-      const event = JSON.parse(message.value.toString());
-      
-      span?.setAttributes({
-        'kafka.topic': context.getTopic(),
-        'kafka.partition': context.getPartition(),
-        'kafka.offset': context.getMessage().offset,
-        'event.type': event.eventType,
-        'event.id': event.eventId
-      });
-
+      const event = JSON.parse(context.getMessage().value.toString());
       await this.processQuizCreated(event);
     });
   }
@@ -586,49 +358,28 @@ export class KafkaConsumerService {
 
 ### 4.1 Step 1: Infrastructure Setup
 
-#### A. Docker Compose cho Observability Stack
+#### A. Basic Docker Compose cho Observability
 ```yaml
 # docker-compose.observability.yml
 version: '3.8'
 
 services:
-  # Metrics Stack
+  # Metrics
   prometheus:
-    image: prom/prometheus:v2.40.0
+    image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./monitoring/prometheus/rules:/etc/prometheus/rules
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
 
-  alertmanager:
-    image: prom/alertmanager:v0.25.0
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - alertmanager_data:/alertmanager
-
-  # Logging Stack  
+  # Logging
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.5.0
     environment:
       - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
       - xpack.security.enabled=false
     ports:
       - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.5.0
@@ -636,67 +387,30 @@ services:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      - elasticsearch
 
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.5.0
-    ports:
-      - "5044:5044"
-      - "9600:9600"
-    volumes:
-      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline
-      - ./monitoring/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml
-    depends_on:
-      - elasticsearch
-
-  # Tracing Stack
+  # Tracing
   jaeger:
-    image: jaegertracing/all-in-one:1.40
+    image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686" # Jaeger UI
       - "14268:14268" # HTTP collector
-      - "14250:14250" # gRPC collector
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
 
   # Visualization
   grafana:
-    image: grafana/grafana:9.3.0
+    image: grafana/grafana:latest
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
-    volumes:
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - grafana_data:/var/lib/grafana
-
-volumes:
-  prometheus_data:
-  alertmanager_data:
-  elasticsearch_data:
-  grafana_data:
 ```
 
-#### B. Prometheus Configuration
+#### B. Basic Prometheus Configuration
 ```yaml
-# monitoring/prometheus/prometheus.yml
+# monitoring/prometheus.yml
 global:
   scrape_interval: 15s
-  evaluation_interval: 15s
-
-rule_files:
-  - "rules/*.yml"
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-          - alertmanager:9093
 
 scrape_configs:
-  # Quiz App Services
   - job_name: 'quiz-services'
     static_configs:
       - targets:
@@ -705,55 +419,36 @@ scrape_configs:
         - 'answer-service:3002'
         - 'scoring-service:3003'
     metrics_path: /metrics
-    scrape_interval: 10s
 
-  # Infrastructure metrics
   - job_name: 'kafka'
     static_configs:
-      - targets: ['kafka:9308'] # JMX exporter port
-    scrape_interval: 30s
+      - targets: ['kafka:9308']
 
   - job_name: 'postgres'
     static_configs:
       - targets: ['postgres-exporter:9187']
-    scrape_interval: 30s
-
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis-exporter:9121']
-    scrape_interval: 30s
-
-  # Node metrics
-  - job_name: 'node'
-    static_configs:
-      - targets: ['node-exporter:9100']
-    scrape_interval: 30s
 ```
 
 ### 4.2 Step 2: Application Instrumentation
 
-#### A. Metrics Implementation trong Services
+#### A. Basic Metrics Implementation
 ```typescript
-// services/quiz-service/src/middleware/metrics.middleware.ts
+// Basic metrics middleware
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { register, Counter, Histogram } from 'prom-client';
+import { Counter, Histogram } from 'prom-client';
 
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
   private httpRequestsTotal = new Counter({
     name: 'http_requests_total',
-    help: 'Total number of HTTP requests',
-    labelNames: ['method', 'route', 'status_code'],
-    registers: [register]
+    help: 'Total HTTP requests',
+    labelNames: ['method', 'status_code']
   });
 
   private httpRequestDuration = new Histogram({
     name: 'http_request_duration_ms',
-    help: 'Duration of HTTP requests in milliseconds',
-    labelNames: ['method', 'route', 'status_code'],
-    buckets: [0.1, 5, 15, 50, 100, 500, 1000],
-    registers: [register]
+    help: 'HTTP request duration',
+    buckets: [1, 5, 15, 50, 100, 500, 1000]
   });
 
   use(req: Request, res: Response, next: NextFunction) {
@@ -761,18 +456,13 @@ export class MetricsMiddleware implements NestMiddleware {
     
     res.on('finish', () => {
       const duration = Date.now() - start;
-      const route = req.route?.path || req.path;
       
       this.httpRequestsTotal.inc({
         method: req.method,
-        route,
         status_code: res.statusCode
       });
       
-      this.httpRequestDuration.observe(
-        { method: req.method, route, status_code: res.statusCode },
-        duration
-      );
+      this.httpRequestDuration.observe(duration);
     });
     
     next();
@@ -789,260 +479,123 @@ export class MetricsController {
 }
 ```
 
-#### B. Event-specific Metrics
+#### B. Basic Event Metrics
 ```typescript
-// shared/metrics/event.metrics.ts
-import { Counter, Histogram, Gauge } from 'prom-client';
+// Simple event metrics
+import { Counter, Histogram } from 'prom-client';
 
 export const eventMetrics = {
-  // Event publishing metrics
   eventsPublished: new Counter({
     name: 'events_published_total',
-    help: 'Total number of events published',
-    labelNames: ['event_type', 'topic', 'service', 'status']
+    help: 'Total events published',
+    labelNames: ['event_type', 'status']
   }),
 
-  eventPublishDuration: new Histogram({
-    name: 'event_publish_duration_ms',
-    help: 'Time taken to publish events',
-    labelNames: ['event_type', 'topic', 'service'],
-    buckets: [1, 5, 10, 25, 50, 100, 250, 500]
-  }),
-
-  // Event consumption metrics
   eventsConsumed: new Counter({
     name: 'events_consumed_total',
-    help: 'Total number of events consumed',
-    labelNames: ['event_type', 'topic', 'service', 'status']
+    help: 'Total events consumed',
+    labelNames: ['event_type', 'status']
   }),
 
   eventProcessingDuration: new Histogram({
     name: 'event_processing_duration_ms',
-    help: 'Time taken to process events',
-    labelNames: ['event_type', 'service', 'status'],
+    help: 'Event processing time',
     buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000]
-  }),
-
-  // Event lag metrics  
-  eventLag: new Gauge({
-    name: 'event_consumer_lag_seconds',
-    help: 'Lag between event creation and processing',
-    labelNames: ['event_type', 'consumer_group', 'topic', 'partition']
-  }),
-
-  // Business metrics
-  quizEventsTotal: new Counter({
-    name: 'quiz_events_total',
-    help: 'Total quiz-related events',
-    labelNames: ['event_type', 'quiz_id']
-  }),
-
-  activeQuizSessions: new Gauge({
-    name: 'active_quiz_sessions',
-    help: 'Number of active quiz sessions',
-    labelNames: ['quiz_id']
   })
 };
 
-// Usage trong event handlers
-export const trackEventProcessing = (
-  eventType: string, 
-  service: string, 
-  processingFn: () => Promise<void>
-) => {
-  return async () => {
-    const startTime = Date.now();
-    const timer = eventMetrics.eventProcessingDuration.startTimer({
-      event_type: eventType,
-      service: service
-    });
+// Simple usage
+export const trackEventProcessing = async (eventType: string, processingFn: () => Promise<void>) => {
+  const timer = eventMetrics.eventProcessingDuration.startTimer();
 
-    try {
-      await processingFn();
-      
-      eventMetrics.eventsConsumed.inc({
-        event_type: eventType,
-        service: service,
-        status: 'success'
-      });
-      
-    } catch (error) {
-      eventMetrics.eventsConsumed.inc({
-        event_type: eventType,
-        service: service,
-        status: 'error'
-      });
-      throw error;
-    } finally {
-      timer();
-    }
-  };
+  try {
+    await processingFn();
+    eventMetrics.eventsConsumed.inc({ event_type: eventType, status: 'success' });
+  } catch (error) {
+    eventMetrics.eventsConsumed.inc({ event_type: eventType, status: 'error' });
+    throw error;
+  } finally {
+    timer();
+  }
 };
 ```
 
-### 4.3 Step 3: Logging Implementation
+### 4.3 Step 3: Basic Logging Implementation
 
-#### A. Structured Event Logging
+#### A. Simple Event Logging
 ```typescript
-// shared/utils/event-logger.ts
+// Basic event logger
 import { logger } from './logger';
-import { trace } from '@opentelemetry/api';
-
-export interface EventLogContext {
-  eventId: string;
-  eventType: string;
-  aggregateId: string;
-  aggregateType: string;
-  version: number;
-  userId?: string;
-  quizId?: string;
-  correlationId?: string;
-}
 
 export class EventLogger {
-  static logEventCreated(context: EventLogContext, payload: any) {
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
+  static logEventCreated(eventType: string, eventId: string, aggregateId: string) {
     logger.info('Event created', {
-      ...context,
-      traceId,
-      spanId,
-      payload: JSON.stringify(payload),
-      phase: 'created',
-      timestamp: new Date().toISOString()
+      eventType,
+      eventId,
+      aggregateId,
+      phase: 'created'
     });
   }
 
-  static logEventPublished(context: EventLogContext, topic: string, partition?: number) {
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
+  static logEventPublished(eventType: string, eventId: string, topic: string) {
     logger.info('Event published', {
-      ...context,
-      traceId,
-      spanId,
-      kafka: { topic, partition },
-      phase: 'published',
-      timestamp: new Date().toISOString()
+      eventType,
+      eventId,
+      topic,
+      phase: 'published'
     });
   }
 
-  static logEventConsumed(context: EventLogContext, consumerGroup: string, offset: string) {
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
+  static logEventConsumed(eventType: string, eventId: string) {
     logger.info('Event consumed', {
-      ...context,
-      traceId,
-      spanId,
-      kafka: { consumerGroup, offset },
-      phase: 'consumed',
-      timestamp: new Date().toISOString()
+      eventType,
+      eventId,
+      phase: 'consumed'
     });
   }
 
-  static logEventProcessed(context: EventLogContext, processingTime: number, result: 'success' | 'error', error?: Error) {
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
+  static logEventProcessed(eventType: string, eventId: string, duration: number, success: boolean) {
     logger.info('Event processed', {
-      ...context,
-      traceId,
-      spanId,
-      processing: {
-        duration: processingTime,
-        result,
-        error: error?.message
-      },
-      phase: 'processed',
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  static logEventError(context: EventLogContext, error: Error, phase: string) {
-    const span = trace.getActiveSpan();
-    const traceId = span?.spanContext().traceId;
-    const spanId = span?.spanContext().spanId;
-
-    logger.error('Event processing error', {
-      ...context,
-      traceId,
-      spanId,
-      error: {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      },
-      phase,
-      timestamp: new Date().toISOString()
+      eventType,
+      eventId,
+      duration,
+      success,
+      phase: 'processed'
     });
   }
 }
 ```
 
-#### B. Quiz Service Event Logging Example
+#### B. Basic Service Logging
 ```typescript
-// services/quiz-service/src/services/quiz.service.ts
-import { EventLogger } from '../../../shared/utils/event-logger';
-import { eventMetrics } from '../../../shared/metrics/event.metrics';
-
+// Simple quiz service logging
 export class QuizService {
-  async createQuiz(createQuizDto: CreateQuizDto, hostId: string): Promise<Quiz> {
-    const quiz = await this.quizRepository.create({...createQuizDto, hostId});
+  async createQuiz(createQuizDto: CreateQuizDto): Promise<Quiz> {
+    const quiz = await this.quizRepository.create(createQuizDto);
     
-    // Create event
-    const event = new QuizCreatedEvent(quiz.id, quiz.title, hostId, quiz.questions);
-    const eventContext: EventLogContext = {
-      eventId: event.eventId,
-      eventType: 'quiz.created',
-      aggregateId: quiz.id,
-      aggregateType: 'quiz',
-      version: 1,
-      userId: hostId,
-      quizId: quiz.id
-    };
+    const event = new QuizCreatedEvent(quiz.id, quiz.title);
 
     // Log event creation
-    EventLogger.logEventCreated(eventContext, {
-      title: quiz.title,
-      questionsCount: quiz.questions.length
-    });
+    EventLogger.logEventCreated('quiz.created', event.eventId, quiz.id);
 
     try {
       // Publish event
-      const startTime = Date.now();
       await this.kafkaProducer.publishEvent(event);
-      const publishTime = Date.now() - startTime;
-
+      
       // Log successful publishing
-      EventLogger.logEventPublished(eventContext, 'quiz-events');
+      EventLogger.logEventPublished('quiz.created', event.eventId, 'quiz-events');
       
       // Update metrics
       eventMetrics.eventsPublished.inc({
         event_type: 'quiz.created',
-        topic: 'quiz-events',
-        service: 'quiz-service',
         status: 'success'
       });
-      
-      eventMetrics.eventPublishDuration.observe({
-        event_type: 'quiz.created',
-        topic: 'quiz-events',
-        service: 'quiz-service'
-      }, publishTime);
 
     } catch (error) {
-      EventLogger.logEventError(eventContext, error, 'publishing');
+      logger.error('Event publishing failed', { error: error.message });
       
       eventMetrics.eventsPublished.inc({
         event_type: 'quiz.created',
-        topic: 'quiz-events',
-        service: 'quiz-service',
         status: 'error'
       });
       
@@ -1054,570 +607,234 @@ export class QuizService {
 }
 ```
 
-### 4.4 Step 4: End-to-End Event Tracing
+### 4.4 Step 4: Basic Event Tracing
 
-#### A. Event Correlation ID System
+#### A. Simple Event Correlation
 ```typescript
-// shared/types/event.types.ts
+// Basic traceable events
 export interface TraceableEvent extends DomainEvent {
   traceId: string;
-  spanId: string;
-  parentSpanId?: string;
   correlationId: string;
-  causationId?: string; // ID of the event that caused this event
   timestamp: string;
-  metadata: {
-    service: string;
-    version: string;
-    environment: string;
-  };
 }
 
-// Event enrichment với trace context
-export class TraceableEventFactory {
-  static createEvent<T extends DomainEvent>(
-    eventType: string,
-    aggregateId: string,
-    payload: any,
-    causationEvent?: TraceableEvent
-  ): TraceableEvent {
-    const span = trace.getActiveSpan();
-    const spanContext = span?.spanContext();
-    
+// Simple event factory
+export class EventFactory {
+  static createEvent(eventType: string, aggregateId: string, payload: any): TraceableEvent {
     return {
       eventId: uuidv4(),
       eventType,
       aggregateId,
-      aggregateType: this.getAggregateType(aggregateId),
       payload,
-      version: 1,
-      traceId: spanContext?.traceId || uuidv4(),
-      spanId: spanContext?.spanId || uuidv4(),
-      parentSpanId: causationEvent?.spanId,
-      correlationId: causationEvent?.correlationId || uuidv4(),
-      causationId: causationEvent?.eventId,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        service: process.env.SERVICE_NAME || 'unknown',
-        version: process.env.SERVICE_VERSION || '1.0.0',
-        environment: process.env.NODE_ENV || 'development'
-      }
-    } as TraceableEvent;
+      traceId: trace.getActiveSpan()?.spanContext().traceId || uuidv4(),
+      correlationId: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
   }
 }
 ```
 
-#### B. Event Saga Tracing
+#### B. Basic Saga Pattern
 ```typescript
-// services/scoring-service/src/sagas/quiz-completion.saga.ts
+// Simple saga example
 export class QuizCompletionSaga {
   @EventPattern('quiz.ended')
   async onQuizEnded(event: QuizEndedEvent): Promise<void> {
-    const sagaId = `quiz-completion-${event.aggregateId}`;
-    const state = new QuizCompletionState(sagaId, event.aggregateId);
-    
-    this.sagaStates.set(sagaId, state);
-    
-    // Step 1: Finalize all scores
-    await this.finalizeScores(event.aggregateId);
-    state.markScoresFinalized();
-    
-    // Step 2: Generate quiz report
-    await this.generateQuizReport(event.aggregateId);
-    state.markReportGenerated();
-    
-    // Step 3: Notify participants
-    await this.notifyParticipants(event.aggregateId, event.payload.participants);
-    state.markParticipantsNotified();
-    
-    // Complete saga
-    state.markCompleted();
-    this.sagaStates.delete(sagaId);
-  }
-
-  @EventPattern('score.finalization.failed')
-  async onScoreFinalizationFailed(event: ScoreFinalizationFailedEvent): Promise<void> {
-    const sagaId = `quiz-completion-${event.aggregateId}`;
-    const state = this.sagaStates.get(sagaId);
-    
-    if (state) {
-      // Compensating action: revert quiz to ended-with-errors state
-      await this.revertQuizCompletion(event.aggregateId);
-      state.markFailed('Score finalization failed');
+    try {
+      // Step 1: Finalize scores
+      await this.finalizeScores(event.aggregateId);
+      
+      // Step 2: Notify participants
+      await this.notifyParticipants(event.aggregateId);
+      
+      logger.info('Quiz completion saga finished', { quizId: event.aggregateId });
+    } catch (error) {
+      logger.error('Quiz completion saga failed', { error: error.message });
     }
   }
 
   private async finalizeScores(quizId: string): Promise<void> {
-    try {
-      await this.kafkaProducer.publishEvent(
-        new FinalizeScoresCommand(quizId)
-      );
-    } catch (error) {
-      await this.kafkaProducer.publishEvent(
-        new ScoreFinalizationFailedEvent(quizId, error.message)
-      );
-      throw error;
-    }
-  }
-
-  private async generateQuizReport(quizId: string): Promise<void> {
-    // Generate comprehensive quiz analytics
-    const analytics = await this.analyticsService.generateQuizReport(quizId);
-    
     await this.kafkaProducer.publishEvent(
-      new QuizReportGeneratedEvent(quizId, analytics)
+      new FinalizeScoresCommand(quizId)
     );
   }
 
-  private async notifyParticipants(quizId: string, participants: string[]): Promise<void> {
-    const notifications = participants.map(playerId => 
-      new ParticipantNotificationEvent(quizId, playerId, 'quiz_completed')
+  private async notifyParticipants(quizId: string): Promise<void> {
+    await this.kafkaProducer.publishEvent(
+      new NotifyParticipantsCommand(quizId)
     );
-    
-    await this.kafkaProducer.publishBatch(notifications);
   }
 }
 ```
 
 ## 5. Monitoring Dashboards & Alerts
 
-### 5.1 Grafana Dashboard Configuration
+### 5.1 Basic Grafana Dashboards
 
-#### A. Event-driven System Overview Dashboard
-```json
-{
-  "dashboard": {
-    "title": "Quiz App - Event-driven System Overview",
-    "panels": [
-      {
-        "title": "Event Publishing Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(events_published_total[5m])",
-            "legendFormat": "{{event_type}} - {{service}}"
-          }
-        ]
-      },
-      {
-        "title": "Event Processing Latency",
-        "type": "heatmap",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(event_processing_duration_ms_bucket[5m]))",
-            "legendFormat": "P95 - {{event_type}}"
-          }
-        ]
-      },
-      {
-        "title": "Kafka Consumer Lag",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "kafka_consumer_lag",
-            "legendFormat": "{{topic}} - {{partition}} - {{consumer_group}}"
-          }
-        ]
-      },
-      {
-        "title": "Event Error Rate",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "rate(events_consumed_total{status=\"error\"}[5m]) / rate(events_consumed_total[5m]) * 100",
-            "legendFormat": "Error Rate %"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+#### A. System Overview Dashboard
+**Key panels**:
+- **Event Publishing Rate**: `rate(events_published_total[5m])`
+- **Event Processing Latency**: `histogram_quantile(0.95, rate(event_processing_duration_ms_bucket[5m]))`
+- **Kafka Consumer Lag**: `kafka_consumer_lag`
+- **Event Error Rate**: `rate(events_consumed_total{status="error"}[5m])`
 
-#### B. Quiz Application Business Metrics Dashboard
-```json
-{
-  "dashboard": {
-    "title": "Quiz App - Business Metrics",
-    "panels": [
-      {
-        "title": "Active Quizzes",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "active_quizzes_current",
-            "legendFormat": "Active Quizzes"
-          }
-        ]
-      },
-      {
-        "title": "Quiz Creation Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(quiz_created_total[5m])",
-            "legendFormat": "Quizzes/min"
-          }
-        ]
-      },
-      {
-        "title": "Answer Submission Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(answer_submitted_total[5m])",
-            "legendFormat": "Answers/min"
-          }
-        ]
-      },
-      {
-        "title": "Quiz Completion Time Distribution",
-        "type": "heatmap",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.50, rate(quiz_duration_seconds_bucket[5m]))",
-            "legendFormat": "P50"
-          },
-          {
-            "expr": "histogram_quantile(0.95, rate(quiz_duration_seconds_bucket[5m]))",
-            "legendFormat": "P95"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+#### B. Business Metrics Dashboard
+**Key panels**:
+- **Active Quizzes**: `active_quizzes_current`
+- **Quiz Creation Rate**: `rate(quiz_created_total[5m])`
+- **Answer Submission Rate**: `rate(answer_submitted_total[5m])`
+- **Service Health**: `up{job="quiz-services"}`
 
-### 5.2 Alerting Rules
+### 5.2 Basic Alerting Rules
 
 #### A. Event Processing Alerts
 ```yaml
-# monitoring/prometheus/rules/event-alerts.yml
+# Basic event alerts
 groups:
-- name: event-processing-alerts
+- name: event-alerts
   rules:
-  - alert: HighEventProcessingLatency
+  - alert: HighEventLatency
     expr: histogram_quantile(0.95, rate(event_processing_duration_ms_bucket[5m])) > 1000
     for: 2m
-    labels:
-      severity: warning
-      team: platform
     annotations:
       summary: "High event processing latency detected"
-      description: "Event processing P95 latency is {{ $value }}ms for {{ $labels.event_type }} in {{ $labels.service }}"
 
-  - alert: EventProcessingErrorRate
-    expr: rate(events_consumed_total{status="error"}[5m]) / rate(events_consumed_total[5m]) > 0.05
+  - alert: EventProcessingErrors
+    expr: rate(events_consumed_total{status="error"}[5m]) > 0.05
     for: 1m
-    labels:
-      severity: critical
-      team: platform
     annotations:
       summary: "High event processing error rate"
-      description: "Event processing error rate is {{ $value | humanizePercentage }}"
 
   - alert: KafkaLag
-    expr: kafka_consumer_lag_sum > 1000
+    expr: kafka_consumer_lag > 1000
     for: 5m
-    labels:
-      severity: warning
-      team: platform
     annotations:
-      summary: "Kafka consumer lag is high: {{ $value }}"
+      summary: "Kafka consumer lag is high"
 ```
 
-#### B. Business Logic Alerts
+#### B. Service Health Alerts
 ```yaml
-# monitoring/prometheus/rules/business-alerts.yml
+# Basic service alerts
 groups:
-- name: business-alerts
+- name: service-alerts
   rules:
-  - alert: QuizCreationRateDrop
-    expr: rate(quiz_created_total[10m]) < 0.1
-    for: 5m
-    labels:
-      severity: warning
-      team: product
-    annotations:
-      summary: "Quiz creation rate dropped significantly"
-      description: "Quiz creation rate is {{ $value }} quizzes/sec, below normal threshold"
-
-  - alert: HighAnswerSubmissionErrors
-    expr: rate(answer_submitted_total{status="error"}[5m]) / rate(answer_submitted_total[5m]) > 0.02
-    for: 2m
-    labels:
-      severity: warning
-      team: product
-    annotations:
-      summary: "High answer submission error rate"
-      description: "Answer submission error rate is {{ $value | humanizePercentage }}"
-
-  - alert: QuizServiceDown
-    expr: up{job="quiz-services", instance=~".*quiz-service.*"} == 0
+  - alert: ServiceDown
+    expr: up{job="quiz-services"} == 0
     for: 30s
-    labels:
-      severity: critical
-      team: platform
     annotations:
       summary: "Quiz service instance is down"
-      description: "Quiz service instance {{ $labels.instance }} is not responding"
+
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.1
+    for: 2m
+    annotations:
+      summary: "High HTTP error rate detected"
 ```
 
 ## 6. Log Analysis & Troubleshooting
 
-### 6.1 Kibana Queries cho Event Debugging
+### 6.1 Basic Kibana Queries
 
 #### A. Event Flow Tracking
-```javascript
-// Kibana search query cho tracking specific event flow
-{
-  "query": {
-    "bool": {
-      "must": [
-        {
-          "match": {
-            "event.type": "quiz.created"
-          }
-        },
-        {
-          "range": {
-            "@timestamp": {
-              "gte": "now-1h",
-              "lte": "now"
-            }
-          }
-        }
-      ]
-    }
-  },
-  "sort": [
-    {
-      "@timestamp": {
-        "order": "desc"
-      }
-    }
-  ]
-}
-
-// Trace all events cho specific correlationId
-{
-  "query": {
-    "match": {
-      "correlationId": "correlation-abc-123"
-    }
-  },
-  "sort": [
-    {
-      "@timestamp": {
-        "order": "asc"
-      }
-    }
-  ]
-}
+**Find specific event types**:
+```
+event.type: "quiz.created" AND @timestamp: [now-1h TO now]
 ```
 
-#### B. Error Analysis Queries
-```javascript
-// Find failed event processing
-{
-  "query": {
-    "bool": {
-      "must": [
-        {
-          "match": {
-            "level": "error"
-          }
-        },
-        {
-          "exists": {
-            "field": "event.type"
-          }
-        }
-      ]
-    }
-  },
-  "aggs": {
-    "error_by_event_type": {
-      "terms": {
-        "field": "event.type.keyword"
-      }
-    }
-  }
-}
-
-// Performance issues tracking
-{
-  "query": {
-    "bool": {
-      "must": [
-        {
-          "range": {
-            "duration": {
-              "gte": 1000
-            }
-          }
-        },
-        {
-          "match": {
-            "phase": "processed"
-          }
-        }
-      ]
-    }
-  }
-}
+**Trace events by correlation ID**:
+```
+correlationId: "correlation-abc-123"
 ```
 
-### 6.2 Troubleshooting Playbooks
+#### B. Error Analysis
+**Find failed events**:
+```
+level: "error" AND event.type: *
+```
+
+**Performance issues**:
+```
+duration: >1000 AND phase: "processed"
+```
+
+### 6.2 Basic Troubleshooting
 
 #### A. Event Processing Delays
-```yaml
-# Troubleshooting steps cho event processing delays
-Steps:
-  1. Check Kafka consumer lag:
-     Query: kafka_consumer_lag > threshold
-     
-  2. Verify service health:
-     Query: up{job="quiz-services"} == 0
-     
-  3. Check event processing metrics:
-     Query: rate(event_processing_duration_ms_bucket[5m])
-     
-  4. Analyze error logs:
-     Kibana: level:error AND event.type:*
-     
-  5. Trace specific slow events:
-     Jaeger: Search by operation "event.process" with high duration
-```
+**Troubleshooting steps**:
+1. Check Kafka consumer lag: `kafka_consumer_lag > 1000`
+2. Verify service health: `up{job="quiz-services"} == 0`
+3. Check processing metrics: `rate(event_processing_duration_ms_bucket[5m])`
+4. Analyze error logs: `level:error AND event.type:*`
 
 #### B. Event Ordering Issues
-```yaml
-# Troubleshooting event ordering problems
-Steps:
-  1. Check Kafka partition assignment:
-     Log query: kafka.partition AND event.type:"quiz.*"
-     
-  2. Verify event versioning:
-     Log query: event.version AND aggregateId:"quiz-123"
-     
-  3. Check causation chain:
-     Log query: causationId:"event-456" OR eventId:"event-456"
-     
-  4. Trace event sequence:
-     Jaeger: Search by correlationId to see full flow
-```
+**Debugging steps**:
+1. Check Kafka partition assignment
+2. Verify event versioning in logs
+3. Trace event sequence by correlationId
+4. Check causation chain in Jaeger
 
 ## 7. Performance Monitoring & Optimization
 
-### 7.1 Event Performance Metrics
+### 7.1 Key Performance Metrics
 
-#### A. Critical Performance KPIs
+#### A. Critical KPIs
+**Event Performance Targets**:
+- **Event E2E Latency**: P95 < 500ms
+- **Event Throughput**: > 1000 events/sec  
+- **Kafka Producer Latency**: P95 < 50ms
+- **Consumer Lag**: < 100 messages
+
+#### B. Basic Performance Monitoring
 ```typescript
-// Performance monitoring configuration
-export const performanceKPIs = {
-  // Event latency metrics
-  eventE2ELatency: {
-    name: 'event_end_to_end_latency_ms',
-    description: 'Time from event creation to final processing',
-    target: 'P95 < 500ms',
-    alert_threshold: 1000
-  },
-  
-  eventThroughput: {
-    name: 'events_per_second',
-    description: 'Number of events processed per second',
-    target: '> 1000 events/sec',
-    alert_threshold: 100
-  },
-  
-  kafkaProducerLatency: {
-    name: 'kafka_producer_latency_ms',
-    description: 'Time to publish to Kafka',
-    target: 'P95 < 50ms',
-    alert_threshold: 100
-  },
-  
-  consumerLag: {
-    name: 'kafka_consumer_lag_messages',
-    description: 'Messages waiting to be processed',
-    target: '< 100 messages',
-    alert_threshold: 1000
-  }
-};
-```
+// Simple performance tracking
+export class PerformanceMonitor {
+  async checkEventPerformance(): Promise<PerformanceReport> {
+    const metrics = await this.prometheusClient.query([
+      'histogram_quantile(0.95, rate(event_processing_duration_ms_bucket[5m]))',
+      'rate(events_published_total[5m])',
+      'kafka_consumer_lag'
+    ]);
 
-#### B. Automated Performance Analysis
-```typescript
-// services/monitoring-service/src/performance-analyzer.ts
-export class PerformanceAnalyzer {
-  async analyzeEventPerformance(timeRange: string = '1h'): Promise<PerformanceReport> {
-    const metrics = await this.prometheusClient.queryRange([
-      `histogram_quantile(0.95, rate(event_processing_duration_ms_bucket[5m]))`,
-      `rate(events_published_total[5m])`,
-      `rate(events_consumed_total[5m])`,
-      `kafka_consumer_lag`
-    ], timeRange);
-
-    const report: PerformanceReport = {
-      timestamp: new Date(),
-      timeRange,
-      eventLatency: {
-        p50: metrics.eventLatency.p50,
-        p95: metrics.eventLatency.p95,
-        p99: metrics.eventLatency.p99
-      },
-      throughput: {
-        published: metrics.publishRate,
-        consumed: metrics.consumeRate,
-        errorRate: metrics.errorRate
-      },
-      bottlenecks: await this.identifyBottlenecks(metrics),
-      recommendations: await this.generateRecommendations(metrics)
+    return {
+      eventLatency: metrics.latency,
+      throughput: metrics.rate,
+      consumerLag: metrics.lag,
+      timestamp: new Date()
     };
-
-    // Auto-alert on performance degradation
-    if (report.eventLatency.p95 > performanceKPIs.eventE2ELatency.alert_threshold) {
-      await this.alertManager.sendAlert('performance-degradation', report);
-    }
-
-    return report;
   }
 
-  private async identifyBottlenecks(metrics: any): Promise<Bottleneck[]> {
-    const bottlenecks: Bottleneck[] = [];
-
-    // Check for slow event processing
-    if (metrics.eventLatency.p95 > 500) {
-      bottlenecks.push({
-        type: 'slow-processing',
-        severity: 'high',
-        description: `Event processing P95 latency is ${metrics.eventLatency.p95}ms`,
-        affectedServices: await this.getSlowServices(metrics)
-      });
+  async identifyBottlenecks(metrics: any): Promise<string[]> {
+    const issues = [];
+    
+    if (metrics.eventLatency > 500) {
+      issues.push('High event processing latency');
     }
-
-    // Check for consumer lag
-    if (metrics.consumerLag.max > 1000) {
-      bottlenecks.push({
-        type: 'consumer-lag',
-        severity: 'medium',
-        description: `Consumer lag is ${metrics.consumerLag.max} messages`,
-        affectedTopics: await this.getLaggedTopics(metrics)
-      });
+    
+    if (metrics.consumerLag > 1000) {
+      issues.push('High consumer lag');
     }
-
-    return bottlenecks;
+    
+    return issues;
   }
 }
 ```
 
-Hệ thống Observability này cung cấp **end-to-end visibility** cho Event-driven Architecture của Quiz App, cho phép chúng ta:
+### 7.2 Performance Optimization Tips
 
-- **Real-time monitoring** của event flows và performance
-- **Root cause analysis** cho issues và failures  
-- **Proactive alerting** để prevent problems
-- **Business insights** từ event data
-- **Performance optimization** dựa trên data-driven decisions
+**Common optimization strategies**:
+- **Scale consumers** when lag is high
+- **Optimize event processing** logic
+- **Use batch processing** for better throughput
+- **Monitor and tune** Kafka configurations
+- **Implement caching** for frequently accessed data
 
-Với implementation này, chúng ta có thể **maintain high reliability** và **quickly troubleshoot** các issues trong complex event-driven system.
+---
+
+Hệ thống Observability này cung cấp **end-to-end visibility** cho Event-driven Architecture của Quiz App, giúp:
+
+- **Real-time monitoring** của event flows
+- **Root cause analysis** cho issues
+- **Proactive alerting** để prevent problems  
+- **Performance optimization** dựa trên metrics
+
+Với implementation này, có thể **maintain high reliability** và **quickly troubleshoot** issues trong event-driven system.
