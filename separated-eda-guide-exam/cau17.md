@@ -32,55 +32,7 @@
 
 ### 2.1 Overall Observability View
 
-```mermaid
-graph LR
-    subgraph "Application Layer"
-        SERVICES[Quiz App Services<br/>User, Quiz, Answer, Scoring]
-        INFRA[Infrastructure<br/>Kafka + PostgreSQL + Redis]
-    end
-    
-    subgraph "Data Collection"
-        METRICS[📊 Metrics<br/>Prometheus Agents]
-        LOGS[📄 Logs<br/>Fluentd/Filebeat]
-        TRACES[🔍 Traces<br/>Jaeger/OpenTelemetry]
-    end
-    
-    subgraph "Storage & Processing"
-        PROMETHEUS[📈 Prometheus<br/>Time-series DB]
-        ELASTICSEARCH[🔎 Elasticsearch<br/>Log Storage]
-        JAEGER_DB[📊 Jaeger<br/>Trace Storage]
-    end
-    
-    subgraph "Visualization"
-        GRAFANA[📱 Grafana<br/>Dashboards & Alerts]
-        KIBANA[🖥️ Kibana<br/>Log Analysis]
-    end
-    
-    %% Data flow
-    SERVICES --> METRICS
-    SERVICES --> LOGS
-    SERVICES --> TRACES
-    INFRA --> METRICS
-    
-    METRICS --> PROMETHEUS
-    LOGS --> ELASTICSEARCH
-    TRACES --> JAEGER_DB
-    
-    PROMETHEUS --> GRAFANA
-    ELASTICSEARCH --> KIBANA
-    JAEGER_DB --> GRAFANA
-    
-    %% Styling
-    classDef app fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef collect fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef store fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef viz fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    
-    class SERVICES,INFRA app
-    class METRICS,LOGS,TRACES collect
-    class PROMETHEUS,ELASTICSEARCH,JAEGER_DB store
-    class GRAFANA,KIBANA viz
-```
+![alt text](../images_v2/17_1.png)
 
 **Luồng đơn giản hóa của Observability:**
 
@@ -97,64 +49,7 @@ graph LR
 
 ### 2.2 Event Lifecycle Observability Flow
 
-```mermaid
-sequenceDiagram
-    participant Client as Frontend Client
-    participant QS as Quiz Service
-    participant Kafka as Kafka Broker
-    participant AS as Answer Service
-    participant SS as Scoring Service
-    participant Obs as Observability Stack
-    
-    Note over Client,Obs: Event: Quiz Started
-    
-    Client->>+QS: POST /quiz/start
-    Note over QS: Generate Trace ID: trace-123
-    QS->>Obs: Log: Quiz start requested
-    QS->>Obs: Metric: quiz_start_requests_total++
-    
-    QS->>QS: Create QuizStartedEvent
-    QS->>Obs: Log: Event created with ID: event-456
-    QS->>Obs: Trace: Span started [quiz.start]
-    
-    QS->>+Kafka: Publish QuizStartedEvent
-    QS->>Obs: Metric: kafka_events_published_total{topic=quiz-events}++
-    Kafka->>Obs: Metric: kafka_topic_partition_current_offset++
-    Kafka-->>QS: Ack
-    QS->>Obs: Log: Event published successfully
-    QS->>Obs: Trace: Span finished [quiz.start] duration=50ms
-    
-    QS-->>-Client: 200 OK {quizId}
-    
-    Note over Kafka,SS: Event Processing Phase
-    
-    Kafka->>+AS: Consume QuizStartedEvent
-    AS->>Obs: Log: Event received, trace-id: trace-123
-    AS->>Obs: Metric: kafka_events_consumed_total{topic=quiz-events}++
-    AS->>Obs: Trace: Span started [answer.process] parent=trace-123
-    
-    AS->>AS: Process event (setup answer tracking)
-    AS->>Obs: Log: Answer tracking initialized for quiz
-    AS->>Obs: Metric: quiz_answer_tracking_initialized++
-    AS->>Obs: Trace: Span finished [answer.process] duration=25ms
-    AS-->>-Kafka: Commit offset
-    
-    Kafka->>+SS: Consume QuizStartedEvent  
-    SS->>Obs: Log: Event received, trace-id: trace-123
-    SS->>Obs: Metric: kafka_events_consumed_total{topic=quiz-events}++
-    SS->>Obs: Trace: Span started [scoring.process] parent=trace-123
-    
-    SS->>SS: Process event (setup leaderboard)
-    SS->>Obs: Log: Leaderboard initialized for quiz
-    SS->>Obs: Metric: leaderboard_initialized++
-    SS->>Obs: Trace: Span finished [scoring.process] duration=30ms
-    SS-->>-Kafka: Commit offset
-    
-    Note over Obs: Complete Event Trace Available
-    Obs->>Obs: Correlate logs by trace-id: trace-123
-    Obs->>Obs: Build distributed trace visualization
-    Obs->>Obs: Calculate end-to-end latency: 105ms
-```
+![alt text](../images_v2/17_2.png)
 
 ## 3. Công cụ Observability cho Event-driven System
 

@@ -138,77 +138,7 @@ class ViewCountAccuracyTest:
 
 ### 3.1 Logical Architecture Overview
 
-```mermaid
-graph TB
-    subgraph "Data Sources"
-        WEB[Web Players]
-        MOBILE[Mobile Apps]
-        SMART[Smart TVs]
-        API[API Clients]
-    end
-    
-    subgraph "Data Ingestion"
-        KAFKA[Kafka Event Streams]
-    end
-    
-    subgraph "Lambda Architecture Core"
-        subgraph "Batch Layer"
-            HDFS[HDFS Raw Data Storage]
-            SPARK[Spark Batch Processing]
-            BATCH_DB[(Batch Views Database)]
-        end
-        
-        subgraph "Speed Layer"
-            STORM[Storm Real-time Processing]
-            REDIS[(Redis Real-time Views)]
-        end
-        
-        subgraph "Serving Layer"
-            QUERY[Query Service]
-            MERGE[Lambda Merge Logic]
-        end
-    end
-    
-    subgraph "Applications"
-        ANALYTICS[Analytics Dashboard]
-        BILLING[Billing System]
-        CREATORS[Creator Portal]
-    end
-    
-    %% Data flow
-    WEB --> KAFKA
-    MOBILE --> KAFKA
-    SMART --> KAFKA
-    API --> KAFKA
-    
-    KAFKA --> HDFS
-    KAFKA --> STORM
-    
-    HDFS --> SPARK
-    SPARK --> BATCH_DB
-    
-    STORM --> REDIS
-    
-    BATCH_DB --> QUERY
-    REDIS --> QUERY
-    QUERY --> MERGE
-    
-    MERGE --> ANALYTICS
-    MERGE --> BILLING
-    MERGE --> CREATORS
-    
-    classDef source fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef batch fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef speed fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef serving fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef app fill:#ffebee,stroke:#c62828,stroke-width:2px
-    
-    class WEB,MOBILE,SMART,API,KAFKA source
-    class HDFS,SPARK,BATCH_DB batch
-    class STORM,REDIS speed
-    class QUERY,MERGE serving
-    class ANALYTICS,BILLING,CREATORS app
-```
+![alt text](../images_v2/18_1.png)
 
 ### 3.2 Data Flow Logic
 
@@ -251,80 +181,12 @@ Total Views = Batch Views (up to last batch) + Speed Views (since last batch)
 
 ### 4.1 Process Flow Diagram
 
-```mermaid
-sequenceDiagram
-    participant User as Video Viewer
-    participant App as Video App
-    participant Kafka as Kafka Stream
-    participant Speed as Speed Layer
-    participant Batch as Batch Layer
-    participant Serve as Serving Layer
-    participant Bill as Billing System
-    
-    Note over User,Bill: Video View Process Flow
-    
-    User->>App: Watch Video
-    App->>Kafka: Publish View Event
-    
-    par Real-time Processing
-        Kafka->>Speed: Stream Event
-        Speed->>Speed: Update Real-time Count
-        Speed->>Serve: Push Live Count
-    and Batch Processing
-        Kafka->>Batch: Store Raw Event
-        Note over Batch: Every Hour/Day
-        Batch->>Batch: Recompute All Views
-        Batch->>Serve: Update Authoritative Count
-    end
-    
-    App->>Serve: Query Current Views
-    Serve->>Serve: Merge Batch + Speed
-    Serve-->>App: Return Total Views
-    
-    Note over Bill: Payment Process
-    Bill->>Serve: Query Revenue-eligible Views
-    Serve->>Serve: Apply Payment Logic
-    Serve-->>Bill: Return Billable Views
-    Bill->>Bill: Calculate Payment
-```
+![alt text](../images_v2/18_2.png)
 
 ### 4.2 Detailed Process Workflows
 
 #### A. View Event Processing Workflow
-```mermaid
-flowchart TD
-    START([Video View Starts]) --> VALIDATE{Valid Event?}
-    VALIDATE -->|Yes| KAFKA[Send to Kafka]
-    VALIDATE -->|No| DROP[Drop Event]
-    
-    KAFKA --> SPEED[Speed Layer Processing]
-    KAFKA --> BATCH[Batch Layer Storage]
-    
-    SPEED --> REALTIME[Update Real-time Count]
-    REALTIME --> CACHE[Update Cache]
-    
-    BATCH --> SCHEDULE{Batch Schedule?}
-    SCHEDULE -->|Yes| COMPUTE[Recompute Views]
-    SCHEDULE -->|No| WAIT[Wait for Schedule]
-    
-    COMPUTE --> VALIDATE_BATCH{Validation Pass?}
-    VALIDATE_BATCH -->|Yes| UPDATE[Update Batch Views]
-    VALIDATE_BATCH -->|No| RETRY[Retry Computation]
-    
-    UPDATE --> SERVE[Update Serving Layer]
-    CACHE --> SERVE
-    
-    SERVE --> API[Expose via API]
-    API --> END([Process Complete])
-    
-    classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef decision fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef storage fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    
-    class START,END process
-    class VALIDATE,SCHEDULE,VALIDATE_BATCH decision
-    class KAFKA,CACHE,SERVE storage
-```
+![alt text](../images_v2/18_3.png)
 
 ## 5. Công cụ Implementation cho Video View Counting
 
